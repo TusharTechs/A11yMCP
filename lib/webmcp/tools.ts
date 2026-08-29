@@ -1,187 +1,90 @@
+import {
+  auditAccessibleNames,
+  auditFocusVisibility,
+  auditFormAssociations,
+  auditKeyboardNavigation,
+} from "@/lib/accessibility/audits";
+import { SITE_MANIFEST } from "@/lib/accessibility/manifest";
+import {
+  applyRemediation,
+  getRemediationSnapshot,
+  rollbackAll,
+  totalViolations,
+} from "@/lib/accessibility/remediation";
+import { buildAccessibilityTree } from "@/lib/accessibility/tree";
+import {
+  buildVerification,
+  runAllAudits,
+} from "@/lib/accessibility/verification";
 import { registerA11yTool } from "./runtime";
 import {
+  ApprovalInputSchema,
   EmptyInputSchema,
-  RepairFocusInputSchema,
+  approvalInputJsonSchema,
   emptyInputJsonSchema,
-  repairFocusInputJsonSchema,
 } from "./schemas";
 
-export type Phase1EventType =
+export type Phase2EventType =
   | "TOOL_INVOKED"
+  | "AUDIT_COMPLETED"
   | "REMEDIATION_APPLIED"
   | "ROLLBACK_APPLIED"
   | "VERIFICATION_COMPLETED";
 
-export interface Phase1EventInput {
-  type: Phase1EventType;
+export interface Phase2EventInput {
+  type: Phase2EventType;
   tool: string;
   message: string;
 }
 
-export interface Phase1Callbacks {
-  logEvent: (event: Phase1EventInput) => void;
-  getFocusEnabled: () => boolean;
-  setFocusEnabled: (value: boolean) => void;
+export interface Phase2Callbacks {
+  logEvent: (event: Phase2EventInput) => void;
+  getRoot: () => Element | null;
 }
 
-interface LastRemediation {
-  id: string;
-  target: string;
-  appliedAt: string;
-}
+type ApprovalInput = { approval: boolean };
 
-type RepairFocusInput = {
-  scope: "page" | "preview";
-  approval: boolean;
-};
+let callbacks: Phase2Callbacks | null = null;
+let phase2ToolsRegistered = false;
 
-let callbacks: Phase1Callbacks | null = null;
-let phase1ToolsRegistered = false;
-let lastRemediation: LastRemediation | null = null;
-
-export function setPhase1Callbacks(cb: Phase1Callbacks): void {
+export function setPhase2Callbacks(cb: Phase2Callbacks): void {
   callbacks = cb;
 }
 
-function requireCallbacks(): Phase1Callbacks {
+function requireCallbacks(): Phase2Callbacks {
   if (!callbacks) {
-    throw new Error("A11yMCP Phase 1 callbacks are not initialized.");
+    throw new Error("A11yMCP Phase 2 callbacks are not initialized.");
   }
-
   return callbacks;
 }
 
+function requireRoot(): Element {
+  const root = requireCallbacks().getRoot();
+  if (!root) {
+    throw new Error("NOMA fixture is not mounted.");
+  }
+  return root;
+}
+
 function logEvent(
-  type: Phase1EventType,
+  type: Phase2EventType,
   tool: string,
   message: string
 ): void {
-  requireCallbacks().logEvent({
-    type,
-    tool,
-    message,
-  });
+  requireCallbacks().logEvent({ type, tool, message });
 }
 
-function getFocusEnabled(): boolean {
-  return requireCallbacks().getFocusEnabled();
-}
-
-function getCapabilities() {
-  return {
-    version: "0.1.0",
-    generatedAt: new Date().toISOString(),
-    supportedCapabilities: [
-      {
-        id: "focus_management",
-        title: "Focus management",
-        status: "supported",
-        actions: ["repair_focus_management", "rollback_focus_management"],
-        verification: ["verify_accessibility_profile"],
-      },
-      {
-        id: "task_verification",
-        title: "Task verification",
-        status: "supported",
-        actions: ["verify_accessibility_profile"],
-        verification: ["verify_accessibility_profile"],
-      },
-    ],
-    limitations: [
-      "Phase 1 demonstrates focus visibility only.",
-      "This is a controlled proof-of-life environment.",
-    ],
-  };
-}
-
-function getState() {
-  const focusEnabled = getFocusEnabled();
-
-  return {
-    mode: "phase-1",
-    generatedAt: new Date().toISOString(),
-    focusRingEnabled: focusEnabled,
-    rollbackAvailable: focusEnabled,
-    activeRemediation: lastRemediation,
-    negotiatedProfile: focusEnabled
-      ? {
-          id: "phase1-focus-management",
-          acceptedCapabilities: ["focus_management"],
-        }
-      : null,
-  };
-}
-
-function getTree() {
-  const focusEnabled = getFocusEnabled();
-
-  return {
-    role: "document",
-    name: "A11yMCP Phase 1",
-    generatedAt: new Date().toISOString(),
-    children: [
-      {
-        role: "main",
-        children: [
-          {
-            role: "button",
-            name: "Keyboard preview control",
-            focusable: true,
-            selector: "#preview-button",
-            violations: focusEnabled
-              ? []
-              : [
-                  {
-                    id: "focus-visible",
-                    severity: "high",
-                    message: "Focus indicator is suppressed.",
-                  },
-                ],
-          },
-        ],
-      },
-    ],
-  };
-}
-
-function getVerification() {
-  const focusEnabled = getFocusEnabled();
-
-  return {
-    profile: "phase1-focus-management",
-    task: "preview_focus_visibility",
-    generatedAt: new Date().toISOString(),
-    taskAccessibility: focusEnabled ? "PASS" : "BLOCKED",
-    summary: focusEnabled ? "pass" : "fail",
-    checks: [
-      {
-        id: "focus_visible",
-        title: "Visible focus indicator",
-        pass: focusEnabled,
-        evidence: focusEnabled
-          ? "Preview control has a visible focus ring."
-          : "Focus indicator is suppressed.",
-      },
-    ],
-  };
-}
-
-export function registerPhase1ToolsOnce(): void {
-  if (phase1ToolsRegistered) {
-    return;
-  }
-
-  phase1ToolsRegistered = true;
+export function registerPhase2ToolsOnce(): void {
+  if (phase2ToolsRegistered) return;
+  phase2ToolsRegistered = true;
 
   registerA11yTool({
     name: "get_accessibility_capabilities",
     title: "Get accessibility capabilities",
     description:
-      "Returns the structured accessibility capabilities exposed by this A11yMCP Phase 1 demo.",
+      "Returns the accessibility capabilities declared by this site's A11yMCP manifest.",
     inputSchema: emptyInputJsonSchema,
-    annotations: {
-      readOnlyHint: true,
-    },
+    annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
     run: async () => {
       logEvent(
@@ -189,8 +92,16 @@ export function registerPhase1ToolsOnce(): void {
         "get_accessibility_capabilities",
         "Capability discovery requested."
       );
-
-      return getCapabilities();
+      return {
+        protocol: "a11ymcp/0.2",
+        site: SITE_MANIFEST.site,
+        generatedAt: new Date().toISOString(),
+        capabilities: SITE_MANIFEST.capabilities,
+        limitations: [
+          "Phase 2 covers names, keyboard operability, form association, and focus visibility.",
+          "Remediations are site-declared via the manifest; the engine validates and applies them.",
+        ],
+      };
     },
   });
 
@@ -198,20 +109,25 @@ export function registerPhase1ToolsOnce(): void {
     name: "get_accessibility_state",
     title: "Get accessibility state",
     description:
-      "Returns the current Phase 1 accessibility state, including whether the focus repair is active.",
+      "Returns applied remediations and the current total violation count for the fixture.",
     inputSchema: emptyInputJsonSchema,
-    annotations: {
-      readOnlyHint: true,
-    },
+    annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
     run: async () => {
+      const root = requireRoot();
       logEvent(
         "TOOL_INVOKED",
         "get_accessibility_state",
         "Accessibility state requested."
       );
-
-      return getState();
+      const applied = getRemediationSnapshot().applied;
+      return {
+        mode: "phase-2",
+        generatedAt: new Date().toISOString(),
+        applied,
+        totalViolations: totalViolations(root),
+        rollbackAvailable: Object.values(applied).some(Boolean),
+      };
     },
   });
 
@@ -219,20 +135,174 @@ export function registerPhase1ToolsOnce(): void {
     name: "inspect_accessibility_tree",
     title: "Inspect accessibility tree",
     description:
-      "Returns a small normalized accessibility tree for the Phase 1 preview area.",
+      "Returns a normalized accessibility tree for the fixture with current violations attached.",
     inputSchema: emptyInputJsonSchema,
-    annotations: {
-      readOnlyHint: true,
-    },
+    annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
     run: async () => {
+      const root = requireRoot();
       logEvent(
         "TOOL_INVOKED",
         "inspect_accessibility_tree",
         "Accessibility tree inspection requested."
       );
+      const violations = runAllAudits(root).flatMap((r) => r.violations);
+      return buildAccessibilityTree(root, violations);
+    },
+  });
 
-      return getTree();
+  registerA11yTool({
+    name: "audit_keyboard_navigation",
+    title: "Audit keyboard navigation",
+    description:
+      "Detects interactive elements that are not keyboard focusable and positive tabindex issues.",
+    inputSchema: emptyInputJsonSchema,
+    annotations: { readOnlyHint: true },
+    schema: EmptyInputSchema,
+    run: async () => {
+      const root = requireRoot();
+      const result = auditKeyboardNavigation(root);
+      logEvent(
+        "AUDIT_COMPLETED",
+        "audit_keyboard_navigation",
+        `${result.violations.length} violation(s) found.`
+      );
+      return result;
+    },
+  });
+
+  registerA11yTool({
+    name: "audit_accessible_names",
+    title: "Audit accessible names",
+    description:
+      "Detects interactive controls that have no accessible name.",
+    inputSchema: emptyInputJsonSchema,
+    annotations: { readOnlyHint: true },
+    schema: EmptyInputSchema,
+    run: async () => {
+      const root = requireRoot();
+      const result = auditAccessibleNames(root);
+      logEvent(
+        "AUDIT_COMPLETED",
+        "audit_accessible_names",
+        `${result.violations.length} violation(s) found.`
+      );
+      return result;
+    },
+  });
+
+  registerA11yTool({
+    name: "audit_form_associations",
+    title: "Audit form associations",
+    description:
+      "Detects form fields missing labels, placeholder-only labels, and unassociated error messages.",
+    inputSchema: emptyInputJsonSchema,
+    annotations: { readOnlyHint: true },
+    schema: EmptyInputSchema,
+    run: async () => {
+      const root = requireRoot();
+      const result = auditFormAssociations(root);
+      logEvent(
+        "AUDIT_COMPLETED",
+        "audit_form_associations",
+        `${result.violations.length} violation(s) found.`
+      );
+      return result;
+    },
+  });
+
+  registerA11yTool({
+    name: "audit_focus_visibility",
+    title: "Audit focus visibility",
+    description:
+      "Probes each focusable control and detects missing visible focus indicators.",
+    inputSchema: emptyInputJsonSchema,
+    annotations: { readOnlyHint: true },
+    schema: EmptyInputSchema,
+    run: async () => {
+      const root = requireRoot();
+      const result = auditFocusVisibility(root);
+      logEvent(
+        "AUDIT_COMPLETED",
+        "audit_focus_visibility",
+        `${result.violations.length} violation(s) found.`
+      );
+      return result;
+    },
+  });
+
+  registerA11yTool({
+    name: "repair_accessible_names",
+    title: "Repair accessible names",
+    description:
+      "Applies the site-declared accessible name remediation (reversible). Requires user approval.",
+    inputSchema: approvalInputJsonSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    schema: ApprovalInputSchema,
+    run: async () => {
+      const root = requireRoot();
+      logEvent(
+        "TOOL_INVOKED",
+        "repair_accessible_names",
+        "Requested accessible name remediation."
+      );
+      const result = await applyRemediation("accessible_names", root);
+      logEvent(
+        "REMEDIATION_APPLIED",
+        "repair_accessible_names",
+        `Violations ${result.beforeViolations} -> ${result.afterViolations}.`
+      );
+      return result;
+    },
+  });
+
+  registerA11yTool({
+    name: "repair_keyboard_navigation",
+    title: "Repair keyboard navigation",
+    description:
+      "Applies the site-declared keyboard remediation for the size selector (reversible). Requires user approval.",
+    inputSchema: approvalInputJsonSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    schema: ApprovalInputSchema,
+    run: async () => {
+      const root = requireRoot();
+      logEvent(
+        "TOOL_INVOKED",
+        "repair_keyboard_navigation",
+        "Requested keyboard navigation remediation."
+      );
+      const result = await applyRemediation("keyboard_navigation", root);
+      logEvent(
+        "REMEDIATION_APPLIED",
+        "repair_keyboard_navigation",
+        `Violations ${result.beforeViolations} -> ${result.afterViolations}.`
+      );
+      return result;
+    },
+  });
+
+  registerA11yTool({
+    name: "repair_form_associations",
+    title: "Repair form associations",
+    description:
+      "Applies the site-declared label and error association remediation (reversible). Requires user approval.",
+    inputSchema: approvalInputJsonSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    schema: ApprovalInputSchema,
+    run: async () => {
+      const root = requireRoot();
+      logEvent(
+        "TOOL_INVOKED",
+        "repair_form_associations",
+        "Requested form association remediation."
+      );
+      const result = await applyRemediation("form_association", root);
+      logEvent(
+        "REMEDIATION_APPLIED",
+        "repair_form_associations",
+        `Violations ${result.beforeViolations} -> ${result.afterViolations}.`
+      );
+      return result;
     },
   });
 
@@ -240,125 +310,24 @@ export function registerPhase1ToolsOnce(): void {
     name: "repair_focus_management",
     title: "Repair focus management",
     description:
-      "Applies a reversible Phase 1 remediation that enables a visible focus ring on the preview control.",
-    inputSchema: repairFocusInputJsonSchema,
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-    },
-    schema: RepairFocusInputSchema,
-    run: async (input: RepairFocusInput) => {
-      const cb = requireCallbacks();
-      const before = cb.getFocusEnabled();
-
+      "Applies the site-declared visible focus remediation (reversible). Requires user approval.",
+    inputSchema: approvalInputJsonSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    schema: ApprovalInputSchema,
+    run: async () => {
+      const root = requireRoot();
       logEvent(
         "TOOL_INVOKED",
         "repair_focus_management",
-        `Requested focus repair for scope=${input.scope}.`
+        "Requested focus management remediation."
       );
-
-      if (before) {
-        return {
-          success: true,
-          alreadyApplied: true,
-          reversible: true,
-          target: "preview-control",
-          before: {
-            focusRingEnabled: true,
-          },
-          after: {
-            focusRingEnabled: true,
-          },
-        };
-      }
-
-      cb.setFocusEnabled(true);
-
-      lastRemediation = {
-        id: "repair_focus_management",
-        target: "preview-control",
-        appliedAt: new Date().toISOString(),
-      };
-
+      const result = await applyRemediation("focus_management", root);
       logEvent(
         "REMEDIATION_APPLIED",
         "repair_focus_management",
-        "Enabled visible focus ring for preview control."
+        `Violations ${result.beforeViolations} -> ${result.afterViolations}.`
       );
-
-      return {
-        success: true,
-        alreadyApplied: false,
-        reversible: true,
-        remediationId: lastRemediation.id,
-        target: "preview-control",
-        before: {
-          focusRingEnabled: false,
-        },
-        after: {
-          focusRingEnabled: true,
-        },
-      };
-    },
-  });
-
-  registerA11yTool({
-    name: "rollback_focus_management",
-    title: "Rollback focus management",
-    description:
-      "Reverts the Phase 1 focus remediation and returns the preview control to its original suppressed-focus state.",
-    inputSchema: emptyInputJsonSchema,
-    annotations: {
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-    },
-    schema: EmptyInputSchema,
-    run: async () => {
-      const cb = requireCallbacks();
-      const before = cb.getFocusEnabled();
-
-      logEvent(
-        "TOOL_INVOKED",
-        "rollback_focus_management",
-        "Requested rollback of focus repair."
-      );
-
-      if (!before) {
-        return {
-          success: true,
-          alreadyRolledBack: true,
-          target: "preview-control",
-          before: {
-            focusRingEnabled: false,
-          },
-          after: {
-            focusRingEnabled: false,
-          },
-        };
-      }
-
-      cb.setFocusEnabled(false);
-      lastRemediation = null;
-
-      logEvent(
-        "ROLLBACK_APPLIED",
-        "rollback_focus_management",
-        "Rolled back visible focus ring."
-      );
-
-      return {
-        success: true,
-        alreadyRolledBack: false,
-        target: "preview-control",
-        before: {
-          focusRingEnabled: true,
-        },
-        after: {
-          focusRingEnabled: false,
-        },
-      };
+      return result;
     },
   });
 
@@ -366,29 +335,48 @@ export function registerPhase1ToolsOnce(): void {
     name: "verify_accessibility_profile",
     title: "Verify accessibility profile",
     description:
-      "Verifies whether the Phase 1 focus management profile is currently satisfied.",
+      "Runs all audits and reports whether the task-critical accessibility state passes.",
     inputSchema: emptyInputJsonSchema,
-    annotations: {
-      readOnlyHint: true,
-    },
+    annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
     run: async () => {
+      const root = requireRoot();
       logEvent(
         "TOOL_INVOKED",
         "verify_accessibility_profile",
         "Verification requested."
       );
-
-      const result = getVerification();
-
+      const result = buildVerification(root);
       logEvent(
         "VERIFICATION_COMPLETED",
         "verify_accessibility_profile",
-        result.summary === "pass"
-          ? "Verification passed."
-          : "Verification failed."
+        result.summary === "pass" ? "Verification passed." : "Verification failed."
       );
+      return result;
+    },
+  });
 
+  registerA11yTool({
+    name: "rollback_all_remediations",
+    title: "Rollback all remediations",
+    description:
+      "Reverts every applied remediation and returns the fixture to its original state.",
+    inputSchema: emptyInputJsonSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    schema: EmptyInputSchema,
+    run: async () => {
+      const root = requireRoot();
+      logEvent(
+        "TOOL_INVOKED",
+        "rollback_all_remediations",
+        "Requested rollback of all remediations."
+      );
+      const result = await rollbackAll(root);
+      logEvent(
+        "ROLLBACK_APPLIED",
+        "rollback_all_remediations",
+        `Rolled back: ${result.rolledBack.join(", ") || "none"}.`
+      );
       return result;
     },
   });

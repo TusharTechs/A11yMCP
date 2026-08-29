@@ -9,9 +9,8 @@ export const emptyInputJsonSchema: WebMCPToolInputSchema = {
   additionalProperties: false,
 };
 
-export const RepairFocusInputSchema = z
+export const ApprovalInputSchema = z
   .object({
-    scope: z.enum(["page", "preview"]).default("page"),
     approval: z.boolean(),
   })
   .strict()
@@ -20,13 +19,9 @@ export const RepairFocusInputSchema = z
     path: ["approval"],
   });
 
-export const repairFocusInputJsonSchema: WebMCPToolInputSchema = {
+export const approvalInputJsonSchema: WebMCPToolInputSchema = {
   type: "object",
   properties: {
-    scope: {
-      type: "string",
-      enum: ["page", "preview"],
-    },
     approval: {
       type: "boolean",
     },

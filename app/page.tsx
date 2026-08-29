@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import StorefrontFixture from "@/components/fixture/StorefrontFixture";
+import { getFixtureRoot } from "@/lib/accessibility/manifest";
 import {
   executeA11yTool,
   getLocalTools,
@@ -8,12 +10,14 @@ import {
   type ToolResult,
 } from "@/lib/webmcp/runtime";
 import {
-  registerPhase1ToolsOnce,
-  setPhase1Callbacks,
-  type Phase1EventInput,
+  registerPhase2ToolsOnce,
+  setPhase2Callbacks,
+  type Phase2EventInput,
 } from "@/lib/webmcp/tools";
+import { useRemediationState } from "@/hooks/use-remediation-state";
+import type { AuditResult, RemediationCategory } from "@/types/accessibility";
 
-interface UiEvent extends Phase1EventInput {
+interface UiEvent extends Phase2EventInput {
   id: string;
   timestamp: string;
 }
@@ -30,11 +34,24 @@ interface LastToolExecution {
   result: ToolResult;
 }
 
+const AUDIT_TOOLS = [
+  "audit_keyboard_navigation",
+  "audit_accessible_names",
+  "audit_form_associations",
+  "audit_focus_visibility",
+] as const;
+
+const CATEGORIES: RemediationCategory[] = [
+  "accessible_names",
+  "keyboard_navigation",
+  "form_association",
+  "focus_management",
+];
+
 function makeId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
-
   return Math.random().toString(36).slice(2);
 }
 
@@ -42,16 +59,16 @@ export default function Home() {
   const [supported, setSupported] = useState(false);
   const [tools, setTools] = useState<ToolSummary[]>([]);
   const [events, setEvents] = useState<UiEvent[]>([]);
-  const [focusEnabled, setFocusEnabledState] = useState(false);
   const [approval, setApproval] = useState(true);
+  const [auditSummary, setAuditSummary] = useState<AuditResult[] | null>(null);
   const [lastExecution, setLastExecution] = useState<LastToolExecution | null>(
     null
   );
 
-  const focusEnabledRef = useRef(false);
+  const remediation = useRemediationState();
 
   useEffect(() => {
-    setPhase1Callbacks({
+    setPhase2Callbacks({
       logEvent: (event) => {
         setEvents((prev) =>
           [
@@ -61,17 +78,13 @@ export default function Home() {
               timestamp: new Date().toISOString(),
             },
             ...prev,
-          ].slice(0, 80)
+          ].slice(0, 120)
         );
       },
-      getFocusEnabled: () => focusEnabledRef.current,
-      setFocusEnabled: (value) => {
-        focusEnabledRef.current = value;
-        setFocusEnabledState(value);
-      },
+      getRoot: () => getFixtureRoot(),
     });
 
-    registerPhase1ToolsOnce();
+    registerPhase2ToolsOnce();
     setSupported(isWebMCPSupported());
 
     setTools(
@@ -87,30 +100,48 @@ export default function Home() {
   async function runTool(name: string, input: unknown): Promise<void> {
     try {
       const result = await executeA11yTool(name, input);
-      setLastExecution({
-        tool: name,
-        result,
-      });
+      setLastExecution({ tool: name, result });
     } catch (error) {
       setLastExecution({
         tool: name,
         result: {
           ok: false,
           error: {
-            message:
-              error instanceof Error ? error.message : "Unexpected error",
+            message: error instanceof Error ? error.message : "Unexpected error",
           },
         },
       });
     }
   }
 
+  async function refreshAudits(): Promise<AuditResult[]> {
+    const results: AuditResult[] = [];
+    for (const name of AUDIT_TOOLS) {
+      const result = await executeA11yTool(name, {});
+      if (result.ok) results.push(result.data as AuditResult);
+    }
+    setAuditSummary(results);
+    return results;
+  }
+
+  async function runAllAudits(): Promise<void> {
+    const results = await refreshAudits();
+    setLastExecution({ tool: "run_all_audits", result: { ok: true, data: results } });
+  }
+
+  async function runAndRefresh(name: string, input: unknown): Promise<void> {
+    await runTool(name, input);
+    await refreshAudits();
+  }
+
+  const allPass = auditSummary?.every((audit) => audit.pass) ?? false;
+
   return (
     <main>
-      <h1>A11yMCP — Phase 1 WebMCP Proof</h1>
+      <h1>A11yMCP — Phase 2 Accessibility Engine</h1>
       <p className="muted">
-        Goal: prove real WebMCP tool registration, validated execution, visible
-        mutation, verification, and rollback.
+        Deterministic snapshot, audits, site-declared remediation, verification,
+        and rollback on a controlled NOMA fixture.
       </p>
 
       <section className="panel" aria-live="polite">
@@ -123,14 +154,13 @@ export default function Home() {
         <p className="muted">
           {supported
             ? "This browser exposes WebMCP tool registration."
-            : "Local tool execution still works, but official Phase 1 verification requires a WebMCP-enabled Chrome build."}
+            : "Local tool execution still works, but official verification requires a WebMCP-enabled Chrome build."}
         </p>
       </section>
 
       <div className="grid">
         <section className="panel">
           <h2>Registered tools</h2>
-
           {tools.length === 0 ? (
             <p className="muted">No tools registered.</p>
           ) : (
@@ -147,22 +177,20 @@ export default function Home() {
         </section>
 
         <section className="panel">
-          <h2>Live preview</h2>
+          <h2>NOMA fixture</h2>
 
-          <div
-            className={`preview-area ${
-              focusEnabled ? "focus-enabled" : "focus-suppressed"
-            }`}
-          >
-            <p className="muted">
-              Tab to the button below. Before repair, focus is suppressed.
-              After repair, focus should be clearly visible.
-            </p>
-
-            <button id="preview-button" className="preview-button" type="button">
-              Keyboard preview control
-            </button>
+          <div className="chips">
+            {CATEGORIES.map((category) => (
+              <span
+                key={category}
+                className={`chip ${remediation.applied[category] ? "chip-pass" : ""}`}
+              >
+                {category}: {remediation.applied[category] ? "applied" : "off"}
+              </span>
+            ))}
           </div>
+
+          <StorefrontFixture />
 
           <div className="checkbox">
             <input
@@ -176,60 +204,101 @@ export default function Home() {
             </label>
           </div>
 
+          <p className="group-label">Discovery</p>
           <div className="button-row">
-            <button
-              type="button"
-              onClick={() => runTool("get_accessibility_capabilities", {})}
-            >
-              Get capabilities
+            <button type="button" onClick={() => runTool("get_accessibility_capabilities", {})}>
+              Capabilities
             </button>
-
-            <button
-              type="button"
-              onClick={() => runTool("get_accessibility_state", {})}
-            >
-              Get state
+            <button type="button" onClick={() => runTool("get_accessibility_state", {})}>
+              State
             </button>
-
-            <button
-              type="button"
-              onClick={() => runTool("inspect_accessibility_tree", {})}
-            >
-              Inspect tree
+            <button type="button" onClick={() => runTool("inspect_accessibility_tree", {})}>
+              Tree
             </button>
+          </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                runTool("repair_focus_management", {
-                  scope: "preview",
-                  approval,
-                })
-              }
-            >
+          <p className="group-label">Audits</p>
+          <div className="button-row">
+            <button type="button" onClick={runAllAudits}>
+              Run all audits
+            </button>
+            <button type="button" onClick={() => runTool("audit_keyboard_navigation", {})}>
+              Keyboard
+            </button>
+            <button type="button" onClick={() => runTool("audit_accessible_names", {})}>
+              Names
+            </button>
+            <button type="button" onClick={() => runTool("audit_form_associations", {})}>
+              Forms
+            </button>
+            <button type="button" onClick={() => runTool("audit_focus_visibility", {})}>
+              Focus
+            </button>
+          </div>
+
+          <p className="group-label">Remediation</p>
+          <div className="button-row">
+            <button type="button" onClick={() => runAndRefresh("repair_accessible_names", { approval })}>
+              Repair names
+            </button>
+            <button type="button" onClick={() => runAndRefresh("repair_keyboard_navigation", { approval })}>
+              Repair keyboard
+            </button>
+            <button type="button" onClick={() => runAndRefresh("repair_form_associations", { approval })}>
+              Repair forms
+            </button>
+            <button type="button" onClick={() => runAndRefresh("repair_focus_management", { approval })}>
               Repair focus
             </button>
-
-            <button
-              type="button"
-              onClick={() => runTool("verify_accessibility_profile", {})}
-            >
-              Verify
+            <button type="button" onClick={() => runAndRefresh("rollback_all_remediations", {})}>
+              Rollback all
             </button>
+          </div>
 
-            <button
-              type="button"
-              onClick={() => runTool("rollback_focus_management", {})}
-            >
-              Rollback
+          <p className="group-label">Verification</p>
+          <div className="button-row">
+            <button type="button" onClick={() => runTool("verify_accessibility_profile", {})}>
+              Verify
             </button>
           </div>
         </section>
       </div>
 
+      {auditSummary ? (
+        <section className="panel">
+          <h2>Audit summary</h2>
+          <div className="chips">
+            {auditSummary.map((audit) => (
+              <span
+                key={audit.id}
+                className={`chip ${audit.pass ? "chip-pass" : "chip-fail"}`}
+              >
+                {audit.title}:{" "}
+                {audit.pass
+                  ? "pass"
+                  : `${audit.violations.length} violation${audit.violations.length === 1 ? "" : "s"}`}
+              </span>
+            ))}
+            <span className={`chip ${allPass ? "chip-pass" : "chip-fail"}`}>
+              Task: {allPass ? "PASS" : "BLOCKED"}
+            </span>
+          </div>
+          {auditSummary.some((audit) => !audit.pass) ? (
+            <pre className="code">
+              {JSON.stringify(
+                auditSummary.flatMap((audit) => audit.violations),
+                null,
+                2
+              )}
+            </pre>
+          ) : (
+            <p className="muted">No violations. The fixture is task-accessible.</p>
+          )}
+        </section>
+      ) : null}
+
       <section className="panel" aria-live="polite">
         <h2>Last tool result</h2>
-
         {lastExecution ? (
           <pre className="code">{JSON.stringify(lastExecution, null, 2)}</pre>
         ) : (
@@ -239,7 +308,6 @@ export default function Home() {
 
       <section className="panel" aria-live="polite">
         <h2>Event log</h2>
-
         {events.length === 0 ? (
           <p className="muted">No events yet.</p>
         ) : (
