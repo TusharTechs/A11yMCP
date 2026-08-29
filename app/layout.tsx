@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
+import TopBar from "@/components/layout/TopBar";
+import WebMCPBootstrap from "@/components/webmcp/bootstrap";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "A11yMCP Phase 1",
-  description: "WebMCP proof-of-life for A11yMCP",
+  title: "A11yMCP — Adaptive Web",
+  description:
+    "Websites expose accessibility capabilities to AI agents, allowing them to adapt live experiences to human needs, verify the result, and complete real tasks.",
 };
 
 export default function RootLayout({
@@ -13,7 +16,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <a className="skip-link" href="#main">
+          Skip to content
+        </a>
+        <TopBar />
+        <WebMCPBootstrap />
+        {children}
+      </body>
     </html>
   );
 }

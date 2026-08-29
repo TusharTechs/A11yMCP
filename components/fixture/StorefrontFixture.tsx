@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import type { KeyboardEvent } from "react";
-import { useCommerceState } from "@/hooks/use-commerce-state";
-import { useRemediationState } from "@/hooks/use-remediation-state";
 import {
   addProductToCart,
   beginCheckout,
@@ -13,8 +11,10 @@ import {
   selectProduct,
   selectSize,
   updateCheckoutField,
+  type CommerceSnapshot,
 } from "@/lib/ecommerce/cart";
 import { formatPrice } from "@/lib/ecommerce/catalog";
+import type { RemediationCategory as AppliedMap } from "@/types/accessibility";
 import type { CheckoutValues } from "@/types/ecommerce";
 
 const FIELD_CONFIG: Array<{
@@ -30,21 +30,28 @@ const FIELD_CONFIG: Array<{
   { id: "postalCode", label: "Postal code", placeholder: "Postal code", type: "text" },
 ];
 
-export default function StorefrontFixture() {
-  const remediation = useRemediationState();
-  const commerce = useCommerceState();
+export interface StorefrontFixtureProps {
+  applied: Record<AppliedMap, boolean>;
+  commerce: CommerceSnapshot;
+  interactive: boolean;
+  rootId: string;
+}
+
+export default function StorefrontFixture({
+  applied,
+  commerce,
+  rootId,
+}: StorefrontFixtureProps) {
   const [searchText, setSearchText] = useState("");
   const [wishlisted, setWishlisted] = useState(false);
 
-  const keyboardFixed = remediation.applied.keyboard_navigation;
-  const formsFixed = remediation.applied.form_association;
-  const selectedProduct = commerce.searchResults.length
-    ? commerce.searchResults.find((p) => p.id === commerce.selectedProductId)
-    : undefined;
-  const activeProduct =
-    selectedProduct ??
-    commerce.searchResults[0];
+  const keyboardFixed = applied.keyboard_navigation;
+  const formsFixed = applied.form_association;
 
+  const selectedProduct = commerce.searchResults.find(
+    (product) => product.id === commerce.selectedProductId
+  );
+  const activeProduct = selectedProduct ?? commerce.searchResults[0];
   const sizes = activeProduct?.sizes ?? [];
 
   function handleRadioKeyDown(
@@ -80,10 +87,10 @@ export default function StorefrontFixture() {
 
   return (
     <section
-      id="noma-fixture"
+      id={rootId}
       aria-label="NOMA demo storefront"
       className={`fixture ${
-        remediation.applied.focus_management ? "fixed-focus" : "defect-focus"
+        applied.focus_management ? "fixed-focus" : "defect-focus"
       }`}
     >
       <div className="fixture-header">
@@ -93,7 +100,7 @@ export default function StorefrontFixture() {
           className="icon-btn"
           data-a11ymcp-target="wishlist"
           aria-label={
-            remediation.applied.accessible_names
+            applied.accessible_names
               ? "Add NOMA Runner to wishlist"
               : undefined
           }
@@ -113,9 +120,9 @@ export default function StorefrontFixture() {
       </div>
 
       <div className="search-row">
-        <label htmlFor="product-search">Search products</label>
+        <label htmlFor={`${rootId}-search`}>Search products</label>
         <input
-          id="product-search"
+          id={`${rootId}-search`}
           type="search"
           placeholder="Search shoes"
           value={searchText}
@@ -154,7 +161,11 @@ export default function StorefrontFixture() {
           </h3>
           <p className="muted">{activeProduct.description}</p>
 
-          <div role="radiogroup" aria-label="Select size" className="size-group">
+          <div
+            role="radiogroup"
+            aria-label="Select size"
+            className="size-group"
+          >
             {sizes.map((size) => (
               <div
                 key={size}
@@ -220,7 +231,9 @@ export default function StorefrontFixture() {
                   type={field.type}
                   placeholder={field.placeholder}
                   value={commerce.checkoutValues[field.id]}
-                  aria-describedby={formsFixed ? `${field.id}-error` : undefined}
+                  aria-describedby={
+                    formsFixed ? `${field.id}-error` : undefined
+                  }
                   aria-invalid={Boolean(error) || undefined}
                   onChange={(event) =>
                     updateCheckoutField(field.id, event.target.value)
@@ -247,7 +260,9 @@ export default function StorefrontFixture() {
           <p>
             Order {commerce.order.id} — {formatPrice(commerce.order.totalCents)}
           </p>
-          <p className="muted">Confirmation sent to {commerce.order.email}.</p>
+          <p className="muted">
+            Confirmation sent to {commerce.order.email}.
+          </p>
           <button type="button" onClick={() => resetCommerce()}>
             Start over
           </button>

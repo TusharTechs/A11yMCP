@@ -107,14 +107,18 @@ export async function executeA11yTool(
 }
 
 export function getLocalTools(): Array<
-  Pick<StoredTool, "name" | "title" | "description" | "annotations">
+  Pick<
+    StoredTool,
+    "name" | "title" | "description" | "annotations" | "inputSchema"
+  >
 > {
   return Array.from(toolRegistry.values()).map(
-    ({ name, title, description, annotations }) => ({
+    ({ name, title, description, annotations, inputSchema }) => ({
       name,
       title,
       description,
       annotations,
+      inputSchema,
     })
   );
 }
