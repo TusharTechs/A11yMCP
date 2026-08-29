@@ -20,15 +20,34 @@ import {
   buildVerification,
   runAllAudits,
 } from "@/lib/accessibility/verification";
+import {
+  addProductToCart,
+  beginCheckout,
+  fillCheckoutForm,
+  getCommerceSnapshot,
+  placeOrder,
+  searchProducts,
+  selectProduct,
+  selectSize,
+} from "@/lib/ecommerce/cart";
+import { findProduct } from "@/lib/ecommerce/catalog";
 import type { AccessibilityNeed } from "@/types/accessibility";
 import { registerA11yTool } from "./runtime";
 import {
+  AddToCartInputSchema,
   ApprovalInputSchema,
   EmptyInputSchema,
+  FillCheckoutInputSchema,
   NegotiateInputSchema,
+  PlaceOrderInputSchema,
+  SearchInputSchema,
+  addToCartInputJsonSchema,
   approvalInputJsonSchema,
   emptyInputJsonSchema,
+  fillCheckoutInputJsonSchema,
   negotiateInputJsonSchema,
+  placeOrderInputJsonSchema,
+  searchInputJsonSchema,
 } from "./schemas";
 
 export type AgentEventType =
@@ -37,7 +56,8 @@ export type AgentEventType =
   | "NEGOTIATION_COMPLETED"
   | "REMEDIATION_APPLIED"
   | "ROLLBACK_APPLIED"
-  | "VERIFICATION_COMPLETED";
+  | "VERIFICATION_COMPLETED"
+  | "TASK_COMPLETED";
 
 export interface AgentEventInput {
   type: AgentEventType;
@@ -52,6 +72,19 @@ export interface AgentCallbacks {
 
 type ApprovalInput = { approval: boolean };
 type NegotiateInput = { needs: AccessibilityNeed[] };
+type SearchInput = { query: string };
+type AddToCartInput = { productId: string; variantId: string };
+type FillCheckoutInput = {
+  sessionId: string;
+  values: {
+    email: string;
+    fullName: string;
+    address: string;
+    city: string;
+    postalCode: string;
+  };
+};
+type PlaceOrderInput = { sessionId: string; confirmation: true };
 
 let callbacks: AgentCallbacks | null = null;
 let toolsRegistered = false;
@@ -87,7 +120,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "get_accessibility_capabilities",
     title: "Get accessibility capabilities",
     description:
-      "Returns the accessibility capabilities declared by this site's A11yMCP manifest, including support status and known unsupported needs.",
+      "Returns the accessibility capabilities declared by this site's A11yMCP manifest, including support status, known unsupported needs, and commerce task tools.",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
@@ -98,11 +131,18 @@ export function registerWebMCPToolsOnce(): void {
         "Capability discovery requested."
       );
       return {
-        protocol: "a11ymcp/0.3",
+        protocol: "a11ymcp/0.4",
         site: SITE_MANIFEST.site,
         generatedAt: new Date().toISOString(),
         capabilities: SITE_MANIFEST.capabilities,
         notCurrentlyDeclared: ["high_contrast", "reduced_motion", "large_targets"],
+        taskTools: [
+          "search_products",
+          "add_product_to_cart",
+          "begin_checkout",
+          "fill_checkout_form",
+          "place_order",
+        ],
         limitations: [
           "Remediations are site-declared via the manifest; the engine validates and applies them.",
           "Needs without a declared capability are rejected, not faked.",
@@ -115,7 +155,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "get_accessibility_state",
     title: "Get accessibility state",
     description:
-      "Returns applied remediations, the current total violation count, and the last negotiated profile.",
+      "Returns applied remediations, violation count, last negotiated profile, and commerce task state.",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
@@ -127,13 +167,20 @@ export function registerWebMCPToolsOnce(): void {
         "Accessibility state requested."
       );
       const applied = getRemediationSnapshot().applied;
+      const commerce = getCommerceSnapshot();
       return {
-        mode: "phase-3",
+        mode: "phase-4",
         generatedAt: new Date().toISOString(),
         applied,
         totalViolations: totalViolations(root),
         rollbackAvailable: Object.values(applied).some(Boolean),
         negotiatedProfile: getNegotiationSnapshot().lastNegotiation,
+        commerce: {
+          taskState: commerce.taskState,
+          cartItems: commerce.items.length,
+          checkoutSessionId: commerce.checkoutSessionId,
+          orderId: commerce.order?.id ?? null,
+        },
       };
     },
   });
@@ -409,6 +456,117 @@ export function registerWebMCPToolsOnce(): void {
         "rollback_all_remediations",
         `Rolled back: ${result.rolledBack.join(", ") || "none"}.`
       );
+      return result;
+    },
+  });
+
+  /* Phase 4 — commerce task tools */
+
+  registerA11yTool({
+    name: "search_products",
+    title: "Search products",
+    description:
+      "Searches the deterministic NOMA catalog and updates the visible product results.",
+    inputSchema: searchInputJsonSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    schema: SearchInputSchema,
+    run: async (input: SearchInput) => {
+      logEvent("TOOL_INVOKED", "search_products", `Query: "${input.query}".`);
+      const results = searchProducts(input.query);
+      return {
+        success: true,
+        count: results.length,
+        products: results.map((product) => ({
+          id: product.id,
+          name: product.name,
+          priceCents: product.priceCents,
+          sizes: product.sizes,
+        })),
+      };
+    },
+  });
+
+  registerA11yTool({
+    name: "add_product_to_cart",
+    title: "Add product to cart",
+    description:
+      "Selects a product and size, then adds it to the cart. Reversible until checkout.",
+    inputSchema: addToCartInputJsonSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    schema: AddToCartInputSchema,
+    run: async (input: AddToCartInput) => {
+      logEvent(
+        "TOOL_INVOKED",
+        "add_product_to_cart",
+        `Product ${input.productId}, size ${input.variantId}.`
+      );
+      const product = findProduct(input.productId);
+      if (!product) {
+        return { success: false, message: `Unknown product: ${input.productId}` };
+      }
+      if (!product.sizes.includes(input.variantId)) {
+        return { success: false, message: `Unknown size: ${input.variantId}` };
+      }
+      selectProduct(input.productId);
+      selectSize(input.variantId);
+      const result = addProductToCart();
+      return {
+        ...result,
+        cartItems: getCommerceSnapshot().items.length,
+      };
+    },
+  });
+
+  registerA11yTool({
+    name: "begin_checkout",
+    title: "Begin checkout",
+    description:
+      "Starts a checkout session for the current cart. Required before filling the checkout form.",
+    inputSchema: emptyInputJsonSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    schema: EmptyInputSchema,
+    run: async () => {
+      logEvent("TOOL_INVOKED", "begin_checkout", "Checkout requested.");
+      return beginCheckout();
+    },
+  });
+
+  registerA11yTool({
+    name: "fill_checkout_form",
+    title: "Fill checkout form",
+    description:
+      "Fills and validates the checkout form for an active checkout session. Returns per-field errors when validation fails.",
+    inputSchema: fillCheckoutInputJsonSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    schema: FillCheckoutInputSchema,
+    run: async (input: FillCheckoutInput) => {
+      logEvent(
+        "TOOL_INVOKED",
+        "fill_checkout_form",
+        `Session ${input.sessionId}.`
+      );
+      return fillCheckoutForm(input.sessionId, input.values);
+    },
+  });
+
+  registerA11yTool({
+    name: "place_order",
+    title: "Place order",
+    description:
+      "Places the order for a filled checkout session. Consequential: requires confirmation to be true.",
+    inputSchema: placeOrderInputJsonSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
+    schema: PlaceOrderInputSchema,
+    run: async (input: PlaceOrderInput) => {
+      logEvent("TOOL_INVOKED", "place_order", `Session ${input.sessionId}.`);
+      const result = placeOrder(input.sessionId);
+      if (result.success && result.order) {
+        logEvent(
+          "TASK_COMPLETED",
+          "place_order",
+          `Order ${result.order.id} placed. Task completed successfully.`
+        );
+      }
       return result;
     },
   });

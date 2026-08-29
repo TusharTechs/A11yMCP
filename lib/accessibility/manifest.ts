@@ -80,8 +80,23 @@ export const SITE_MANIFEST: SiteManifest = {
     form_association: [
       {
         selector: "#email",
-        change:
-          'label[for="email"], aria-describedby="email-error", role="alert" on error',
+        change: 'label[for="email"], aria-describedby="email-error", role="alert"',
+      },
+      {
+        selector: "#fullName",
+        change: 'label[for="fullName"], aria-describedby="fullName-error", role="alert"',
+      },
+      {
+        selector: "#address",
+        change: 'label[for="address"], aria-describedby="address-error", role="alert"',
+      },
+      {
+        selector: "#city",
+        change: 'label[for="city"], aria-describedby="city-error", role="alert"',
+      },
+      {
+        selector: "#postalCode",
+        change: 'label[for="postalCode"], aria-describedby="postalCode-error", role="alert"',
       },
     ],
     focus_management: [

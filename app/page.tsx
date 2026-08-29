@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import StorefrontFixture from "@/components/fixture/StorefrontFixture";
+import { useCommerceState } from "@/hooks/use-commerce-state";
 import { useNegotiationState } from "@/hooks/use-negotiation-state";
 import { useRemediationState } from "@/hooks/use-remediation-state";
 import { getFixtureRoot } from "@/lib/accessibility/manifest";
@@ -63,6 +64,19 @@ const CATEGORIES: RemediationCategory[] = [
   "focus_management",
 ];
 
+const VALID_CHECKOUT = {
+  email: "alex@example.com",
+  fullName: "Alex Sharma",
+  address: "12 Lake Street",
+  city: "Bengaluru",
+  postalCode: "560001",
+};
+
+const INVALID_CHECKOUT = {
+  ...VALID_CHECKOUT,
+  email: "not-an-email",
+};
+
 function makeId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -82,6 +96,7 @@ export default function Home() {
 
   const remediation = useRemediationState();
   const negotiation = useNegotiationState();
+  const commerce = useCommerceState();
 
   useEffect(() => {
     setAgentCallbacks({
@@ -94,7 +109,7 @@ export default function Home() {
               timestamp: new Date().toISOString(),
             },
             ...prev,
-          ].slice(0, 120)
+          ].slice(0, 160)
         );
       },
       getRoot: () => getFixtureRoot(),
@@ -158,9 +173,7 @@ export default function Home() {
     await runTool("negotiate_accessibility_profile", { needs });
   }
 
-  function handlePreferencesSubmit(
-    event: FormEvent<HTMLFormElement>
-  ): void {
+  function handlePreferencesSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const needs = data
@@ -187,6 +200,8 @@ export default function Home() {
     await refreshAudits();
   }
 
+  const sessionId = commerce.checkoutSessionId ?? "no-session";
+
   const allPass = auditSummary?.every((audit) => audit.pass) ?? false;
   const lastNegotiation = negotiation.lastNegotiation;
   const partialAccepted =
@@ -194,10 +209,10 @@ export default function Home() {
 
   return (
     <main>
-      <h1>A11yMCP — Phase 3 Negotiation</h1>
+      <h1>A11yMCP — Phase 4 Task Completion</h1>
       <p className="muted">
-        Human needs are negotiated against site-declared capabilities. Accepted
-        capabilities drive remediation; rejected needs are reported honestly.
+        Accessibility negotiation plus a deterministic ecommerce task: search,
+        variant selection, cart, checkout, and order completion.
       </p>
 
       <section className="panel" aria-live="polite">
@@ -463,6 +478,63 @@ export default function Home() {
               onClick={() => runAndRefresh("rollback_all_remediations", {})}
             >
               Rollback all
+            </button>
+          </div>
+
+          <p className="group-label">Commerce (agent path)</p>
+          <div className="button-row">
+            <button
+              type="button"
+              onClick={() => runTool("search_products", { query: "runner" })}
+            >
+              Search runner
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                runTool("add_product_to_cart", {
+                  productId: "noma-runner",
+                  variantId: "9",
+                })
+              }
+            >
+              Add to cart
+            </button>
+            <button
+              type="button"
+              onClick={() => runTool("begin_checkout", {})}
+            >
+              Begin checkout
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                runTool("fill_checkout_form", {
+                  sessionId,
+                  values: INVALID_CHECKOUT,
+                })
+              }
+            >
+              Fill invalid
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                runTool("fill_checkout_form", {
+                  sessionId,
+                  values: VALID_CHECKOUT,
+                })
+              }
+            >
+              Fill valid
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                runTool("place_order", { sessionId, confirmation: true })
+              }
+            >
+              Place order
             </button>
           </div>
 

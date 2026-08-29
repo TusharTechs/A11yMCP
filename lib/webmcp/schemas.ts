@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ALL_NEEDS } from "@/types/accessibility";
+import { CheckoutValuesSchema } from "@/lib/ecommerce/checkout";
 
 export const EmptyInputSchema = z.object({}).strict();
 
@@ -50,5 +51,84 @@ export const negotiateInputJsonSchema: WebMCPToolInputSchema = {
     },
   },
   required: ["needs"],
+  additionalProperties: false,
+};
+
+/* Phase 4 — commerce */
+
+export const SearchInputSchema = z
+  .object({
+    query: z.string().max(60),
+  })
+  .strict();
+
+export const searchInputJsonSchema: WebMCPToolInputSchema = {
+  type: "object",
+  properties: {
+    query: { type: "string", maxLength: 60 },
+  },
+  required: ["query"],
+  additionalProperties: false,
+};
+
+export const AddToCartInputSchema = z
+  .object({
+    productId: z.string(),
+    variantId: z.string(),
+  })
+  .strict();
+
+export const addToCartInputJsonSchema: WebMCPToolInputSchema = {
+  type: "object",
+  properties: {
+    productId: { type: "string" },
+    variantId: { type: "string" },
+  },
+  required: ["productId", "variantId"],
+  additionalProperties: false,
+};
+
+export const FillCheckoutInputSchema = z
+  .object({
+    sessionId: z.string(),
+    values: CheckoutValuesSchema,
+  })
+  .strict();
+
+export const fillCheckoutInputJsonSchema: WebMCPToolInputSchema = {
+  type: "object",
+  properties: {
+    sessionId: { type: "string" },
+    values: {
+      type: "object",
+      properties: {
+        email: { type: "string" },
+        fullName: { type: "string" },
+        address: { type: "string" },
+        city: { type: "string" },
+        postalCode: { type: "string" },
+      },
+      required: ["email", "fullName", "address", "city", "postalCode"],
+      additionalProperties: false,
+    },
+  },
+  required: ["sessionId", "values"],
+  additionalProperties: false,
+};
+
+export const PlaceOrderInputSchema = z
+  .object({
+    sessionId: z.string(),
+    confirmation: z.literal(true),
+  })
+  .strict();
+
+export const placeOrderInputJsonSchema: WebMCPToolInputSchema = {
+  type: "object",
+  properties: {
+    sessionId: { type: "string" },
+    confirmation: { type: "boolean", enum: [true] },
+  },
+  required: ["sessionId", "confirmation"],
   additionalProperties: false,
 };

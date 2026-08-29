@@ -1,43 +1,71 @@
 "use client";
 
 import { useState } from "react";
-import type { FormEvent, KeyboardEvent } from "react";
+import type { KeyboardEvent } from "react";
+import { useCommerceState } from "@/hooks/use-commerce-state";
 import { useRemediationState } from "@/hooks/use-remediation-state";
+import {
+  addProductToCart,
+  beginCheckout,
+  placeOrder,
+  resetCommerce,
+  searchProducts,
+  selectProduct,
+  selectSize,
+  updateCheckoutField,
+} from "@/lib/ecommerce/cart";
+import { formatPrice } from "@/lib/ecommerce/catalog";
+import type { CheckoutValues } from "@/types/ecommerce";
 
-const SIZES = ["8", "9", "10"] as const;
-type Size = (typeof SIZES)[number];
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const FIELD_CONFIG: Array<{
+  id: keyof CheckoutValues;
+  label: string;
+  placeholder: string;
+  type: string;
+}> = [
+  { id: "email", label: "Email", placeholder: "Email", type: "email" },
+  { id: "fullName", label: "Full name", placeholder: "Full name", type: "text" },
+  { id: "address", label: "Address", placeholder: "Address", type: "text" },
+  { id: "city", label: "City", placeholder: "City", type: "text" },
+  { id: "postalCode", label: "Postal code", placeholder: "Postal code", type: "text" },
+];
 
 export default function StorefrontFixture() {
   const remediation = useRemediationState();
-  const [selectedSize, setSelectedSize] = useState<Size | null>(null);
-  const [cartCount, setCartCount] = useState(0);
+  const commerce = useCommerceState();
+  const [searchText, setSearchText] = useState("");
   const [wishlisted, setWishlisted] = useState(false);
-  const [email, setEmail] = useState("");
-  const [emailError, setEmailError] = useState(false);
 
   const keyboardFixed = remediation.applied.keyboard_navigation;
+  const formsFixed = remediation.applied.form_association;
+  const selectedProduct = commerce.searchResults.length
+    ? commerce.searchResults.find((p) => p.id === commerce.selectedProductId)
+    : undefined;
+  const activeProduct =
+    selectedProduct ??
+    commerce.searchResults[0];
+
+  const sizes = activeProduct?.sizes ?? [];
 
   function handleRadioKeyDown(
     event: KeyboardEvent<HTMLDivElement>,
-    size: Size
+    size: string
   ): void {
     if (!keyboardFixed) return;
 
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      setSelectedSize(size);
+      selectSize(size);
       return;
     }
 
-    const index = SIZES.indexOf(size);
+    const index = sizes.indexOf(size);
     let next = -1;
     if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-      next = (index + 1) % SIZES.length;
+      next = (index + 1) % sizes.length;
     }
     if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-      next = (index - 1 + SIZES.length) % SIZES.length;
+      next = (index - 1 + sizes.length) % sizes.length;
     }
     if (next === -1) return;
 
@@ -47,12 +75,7 @@ export default function StorefrontFixture() {
       ? Array.from(group.querySelectorAll<HTMLElement>('[role="radio"]'))
       : [];
     radios[next]?.focus();
-    setSelectedSize(SIZES[next]);
-  }
-
-  function handleEmailSubmit(event: FormEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    setEmailError(!EMAIL_PATTERN.test(email));
+    selectSize(sizes[next]);
   }
 
   return (
@@ -64,7 +87,7 @@ export default function StorefrontFixture() {
       }`}
     >
       <div className="fixture-header">
-        <h2>NOMA Runner</h2>
+        <h2>NOMA Store</h2>
         <button
           type="button"
           className="icon-btn"
@@ -89,61 +112,147 @@ export default function StorefrontFixture() {
         </button>
       </div>
 
-      <div role="radiogroup" aria-label="Select size" className="size-group">
-        {SIZES.map((size) => (
-          <div
-            key={size}
-            role="radio"
-            aria-checked={selectedSize === size}
-            tabIndex={keyboardFixed ? 0 : undefined}
-            onKeyDown={(event) => handleRadioKeyDown(event, size)}
-            onClick={() => setSelectedSize(size)}
-            className="size-option"
-          >
-            {size}
-          </div>
-        ))}
+      <div className="search-row">
+        <label htmlFor="product-search">Search products</label>
+        <input
+          id="product-search"
+          type="search"
+          placeholder="Search shoes"
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+        />
+        <button type="button" onClick={() => searchProducts(searchText)}>
+          Search
+        </button>
       </div>
 
-      <button
-        type="button"
-        disabled={!selectedSize}
-        onClick={() => setCartCount((current) => current + 1)}
-      >
-        Add to cart
-      </button>
-
-      <form onSubmit={handleEmailSubmit} noValidate>
-        {remediation.applied.form_association ? (
-          <label htmlFor="email">Email</label>
+      <ul className="product-list">
+        {commerce.searchResults.map((product) => (
+          <li key={product.id} className="product-card">
+            <div>
+              <strong>{product.name}</strong>
+              <span className="muted"> {formatPrice(product.priceCents)}</span>
+            </div>
+            <button
+              type="button"
+              aria-pressed={product.id === commerce.selectedProductId}
+              onClick={() => selectProduct(product.id)}
+            >
+              Select {product.name}
+            </button>
+          </li>
+        ))}
+        {commerce.searchResults.length === 0 ? (
+          <li className="muted">No products match this search.</li>
         ) : null}
-        <input
-          id="email"
-          name="email"
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          aria-describedby={
-            remediation.applied.form_association ? "email-error" : undefined
-          }
-          aria-invalid={emailError || undefined}
-        />
-        <p
-          id="email-error"
-          className="field-error"
-          role={remediation.applied.form_association ? "alert" : undefined}
-          hidden={!emailError}
-        >
-          Enter a valid email address.
-        </p>
-        <button type="submit">Continue</button>
-      </form>
+      </ul>
+
+      {activeProduct ? (
+        <div className="product-detail">
+          <h3>
+            {activeProduct.name} — {formatPrice(activeProduct.priceCents)}
+          </h3>
+          <p className="muted">{activeProduct.description}</p>
+
+          <div role="radiogroup" aria-label="Select size" className="size-group">
+            {sizes.map((size) => (
+              <div
+                key={size}
+                role="radio"
+                aria-checked={commerce.selectedSize === size}
+                tabIndex={keyboardFixed ? 0 : undefined}
+                onKeyDown={(event) => handleRadioKeyDown(event, size)}
+                onClick={() => selectSize(size)}
+                className="size-option"
+              >
+                {size}
+              </div>
+            ))}
+          </div>
+
+          <button type="button" onClick={() => addProductToCart()}>
+            Add to cart
+          </button>
+        </div>
+      ) : null}
 
       <p className="muted" aria-live="polite">
-        Selected size: {selectedSize ?? "none"} · Cart: {cartCount} item
-        {cartCount === 1 ? "" : "s"}
+        {commerce.statusMessage || "Ready."} Selected size:{" "}
+        {commerce.selectedSize ?? "none"}.
       </p>
+
+      {commerce.items.length > 0 && !commerce.order ? (
+        <div className="cart-panel">
+          <h3>Cart</h3>
+          <ul>
+            {commerce.items.map((item) => (
+              <li key={`${item.productId}-${item.size}`}>
+                {item.quantity} × {item.name} (size {item.size}) —{" "}
+                {formatPrice(item.priceCents * item.quantity)}
+              </li>
+            ))}
+          </ul>
+          <button type="button" onClick={() => beginCheckout()}>
+            Checkout
+          </button>
+        </div>
+      ) : null}
+
+      {commerce.checkoutSessionId && !commerce.order ? (
+        <form
+          className="checkout-panel"
+          onSubmit={(event) => {
+            event.preventDefault();
+            placeOrder(commerce.checkoutSessionId as string);
+          }}
+          noValidate
+        >
+          <h3>Checkout</h3>
+          {FIELD_CONFIG.map((field) => {
+            const error = commerce.checkoutErrors[field.id];
+            return (
+              <div className="field" key={field.id}>
+                {formsFixed ? (
+                  <label htmlFor={field.id}>{field.label}</label>
+                ) : null}
+                <input
+                  id={field.id}
+                  type={field.type}
+                  placeholder={field.placeholder}
+                  value={commerce.checkoutValues[field.id]}
+                  aria-describedby={formsFixed ? `${field.id}-error` : undefined}
+                  aria-invalid={Boolean(error) || undefined}
+                  onChange={(event) =>
+                    updateCheckoutField(field.id, event.target.value)
+                  }
+                />
+                <p
+                  id={`${field.id}-error`}
+                  className="field-error"
+                  role={formsFixed ? "alert" : undefined}
+                  hidden={!error}
+                >
+                  {error}
+                </p>
+              </div>
+            );
+          })}
+          <button type="submit">Place order</button>
+        </form>
+      ) : null}
+
+      {commerce.order ? (
+        <div className="order-confirm" role="status">
+          <h3>Task completed successfully.</h3>
+          <p>
+            Order {commerce.order.id} — {formatPrice(commerce.order.totalCents)}
+          </p>
+          <p className="muted">Confirmation sent to {commerce.order.email}.</p>
+          <button type="button" onClick={() => resetCommerce()}>
+            Start over
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }

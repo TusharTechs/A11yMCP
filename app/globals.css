@@ -314,3 +314,100 @@ button:disabled {
     color: #fbbf24;
   }
 }
+
+/* Phase 4 — commerce */
+
+.search-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search-row label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.search-row input {
+  flex: 1;
+  min-width: 140px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+
+.product-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.product-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.product-detail {
+  display: grid;
+  gap: 8px;
+}
+
+.product-detail h3 {
+  margin: 0;
+}
+
+.cart-panel,
+.checkout-panel,
+.order-confirm {
+  border-top: 1px dashed var(--border);
+  padding-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.cart-panel h3,
+.checkout-panel h3,
+.order-confirm h3 {
+  margin: 0;
+}
+
+.cart-panel ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+}
+
+.field label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.field input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+
+.order-confirm {
+  border: 1px solid #16a34a;
+  border-radius: 10px;
+  padding: 12px;
+}
