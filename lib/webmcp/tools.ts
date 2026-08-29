@@ -6,6 +6,10 @@ import {
 } from "@/lib/accessibility/audits";
 import { SITE_MANIFEST } from "@/lib/accessibility/manifest";
 import {
+  getNegotiationSnapshot,
+  negotiateProfile,
+} from "@/lib/accessibility/negotiation";
+import {
   applyRemediation,
   getRemediationSnapshot,
   rollbackAll,
@@ -16,44 +20,49 @@ import {
   buildVerification,
   runAllAudits,
 } from "@/lib/accessibility/verification";
+import type { AccessibilityNeed } from "@/types/accessibility";
 import { registerA11yTool } from "./runtime";
 import {
   ApprovalInputSchema,
   EmptyInputSchema,
+  NegotiateInputSchema,
   approvalInputJsonSchema,
   emptyInputJsonSchema,
+  negotiateInputJsonSchema,
 } from "./schemas";
 
-export type Phase2EventType =
+export type AgentEventType =
   | "TOOL_INVOKED"
   | "AUDIT_COMPLETED"
+  | "NEGOTIATION_COMPLETED"
   | "REMEDIATION_APPLIED"
   | "ROLLBACK_APPLIED"
   | "VERIFICATION_COMPLETED";
 
-export interface Phase2EventInput {
-  type: Phase2EventType;
+export interface AgentEventInput {
+  type: AgentEventType;
   tool: string;
   message: string;
 }
 
-export interface Phase2Callbacks {
-  logEvent: (event: Phase2EventInput) => void;
+export interface AgentCallbacks {
+  logEvent: (event: AgentEventInput) => void;
   getRoot: () => Element | null;
 }
 
 type ApprovalInput = { approval: boolean };
+type NegotiateInput = { needs: AccessibilityNeed[] };
 
-let callbacks: Phase2Callbacks | null = null;
-let phase2ToolsRegistered = false;
+let callbacks: AgentCallbacks | null = null;
+let toolsRegistered = false;
 
-export function setPhase2Callbacks(cb: Phase2Callbacks): void {
+export function setAgentCallbacks(cb: AgentCallbacks): void {
   callbacks = cb;
 }
 
-function requireCallbacks(): Phase2Callbacks {
+function requireCallbacks(): AgentCallbacks {
   if (!callbacks) {
-    throw new Error("A11yMCP Phase 2 callbacks are not initialized.");
+    throw new Error("A11yMCP callbacks are not initialized.");
   }
   return callbacks;
 }
@@ -66,23 +75,19 @@ function requireRoot(): Element {
   return root;
 }
 
-function logEvent(
-  type: Phase2EventType,
-  tool: string,
-  message: string
-): void {
+function logEvent(type: AgentEventType, tool: string, message: string): void {
   requireCallbacks().logEvent({ type, tool, message });
 }
 
-export function registerPhase2ToolsOnce(): void {
-  if (phase2ToolsRegistered) return;
-  phase2ToolsRegistered = true;
+export function registerWebMCPToolsOnce(): void {
+  if (toolsRegistered) return;
+  toolsRegistered = true;
 
   registerA11yTool({
     name: "get_accessibility_capabilities",
     title: "Get accessibility capabilities",
     description:
-      "Returns the accessibility capabilities declared by this site's A11yMCP manifest.",
+      "Returns the accessibility capabilities declared by this site's A11yMCP manifest, including support status and known unsupported needs.",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
@@ -93,13 +98,14 @@ export function registerPhase2ToolsOnce(): void {
         "Capability discovery requested."
       );
       return {
-        protocol: "a11ymcp/0.2",
+        protocol: "a11ymcp/0.3",
         site: SITE_MANIFEST.site,
         generatedAt: new Date().toISOString(),
         capabilities: SITE_MANIFEST.capabilities,
+        notCurrentlyDeclared: ["high_contrast", "reduced_motion", "large_targets"],
         limitations: [
-          "Phase 2 covers names, keyboard operability, form association, and focus visibility.",
           "Remediations are site-declared via the manifest; the engine validates and applies them.",
+          "Needs without a declared capability are rejected, not faked.",
         ],
       };
     },
@@ -109,7 +115,7 @@ export function registerPhase2ToolsOnce(): void {
     name: "get_accessibility_state",
     title: "Get accessibility state",
     description:
-      "Returns applied remediations and the current total violation count for the fixture.",
+      "Returns applied remediations, the current total violation count, and the last negotiated profile.",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
@@ -122,11 +128,12 @@ export function registerPhase2ToolsOnce(): void {
       );
       const applied = getRemediationSnapshot().applied;
       return {
-        mode: "phase-2",
+        mode: "phase-3",
         generatedAt: new Date().toISOString(),
         applied,
         totalViolations: totalViolations(root),
         rollbackAvailable: Object.values(applied).some(Boolean),
+        negotiatedProfile: getNegotiationSnapshot().lastNegotiation,
       };
     },
   });
@@ -148,6 +155,30 @@ export function registerPhase2ToolsOnce(): void {
       );
       const violations = runAllAudits(root).flatMap((r) => r.violations);
       return buildAccessibilityTree(root, violations);
+    },
+  });
+
+  registerA11yTool({
+    name: "negotiate_accessibility_profile",
+    title: "Negotiate accessibility profile",
+    description:
+      "Matches the user's accessibility needs against the site's declared capabilities. Returns accepted, partial, and rejected capabilities with reasons.",
+    inputSchema: negotiateInputJsonSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    schema: NegotiateInputSchema,
+    run: async (input: NegotiateInput) => {
+      logEvent(
+        "TOOL_INVOKED",
+        "negotiate_accessibility_profile",
+        `Negotiating for needs: ${input.needs.join(", ")}.`
+      );
+      const profile = negotiateProfile(input.needs);
+      logEvent(
+        "NEGOTIATION_COMPLETED",
+        "negotiate_accessibility_profile",
+        `${profile.accepted.length} accepted, ${profile.rejected.length} rejected.`
+      );
+      return profile;
     },
   });
 
@@ -174,8 +205,7 @@ export function registerPhase2ToolsOnce(): void {
   registerA11yTool({
     name: "audit_accessible_names",
     title: "Audit accessible names",
-    description:
-      "Detects interactive controls that have no accessible name.",
+    description: "Detects interactive controls that have no accessible name.",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
@@ -350,7 +380,9 @@ export function registerPhase2ToolsOnce(): void {
       logEvent(
         "VERIFICATION_COMPLETED",
         "verify_accessibility_profile",
-        result.summary === "pass" ? "Verification passed." : "Verification failed."
+        result.summary === "pass"
+          ? "Verification passed."
+          : "Verification failed."
       );
       return result;
     },

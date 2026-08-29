@@ -281,3 +281,36 @@ button:disabled {
   outline-offset: 2px;
   box-shadow: 0 0 0 5px rgb(37 99 235 / 0.25);
 }
+
+/* Phase 3 — negotiation */
+
+.pref-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.pref-option {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 14px;
+  text-transform: capitalize;
+}
+
+.negotiation-note {
+  font-size: 13px;
+}
+
+.chip-partial {
+  border-color: #d97706;
+  color: #92400e;
+}
+
+@media (prefers-color-scheme: dark) {
+  .chip-partial {
+    color: #fbbf24;
+  }
+}

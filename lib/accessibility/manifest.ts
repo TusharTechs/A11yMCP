@@ -1,4 +1,7 @@
-import type { RemediationCategory } from "@/types/accessibility";
+import type {
+  CapabilityStatus,
+  RemediationCategory,
+} from "@/types/accessibility";
 
 export interface RemediationDirective {
   selector: string;
@@ -11,7 +14,8 @@ export interface SiteManifest {
   capabilities: Array<{
     id: RemediationCategory;
     title: string;
-    status: "supported";
+    status: CapabilityStatus;
+    limitation?: string;
     auditTool: string;
     repairTool: string;
   }>;
@@ -32,7 +36,8 @@ export const SITE_MANIFEST: SiteManifest = {
     {
       id: "accessible_names",
       title: "Accessible names",
-      status: "supported",
+      status: "partial",
+      limitation: "Declared names cover task-critical controls only.",
       auditTool: "audit_accessible_names",
       repairTool: "repair_accessible_names",
     },

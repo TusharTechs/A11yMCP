@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ALL_NEEDS } from "@/types/accessibility";
 
 export const EmptyInputSchema = z.object({}).strict();
 
@@ -27,5 +28,27 @@ export const approvalInputJsonSchema: WebMCPToolInputSchema = {
     },
   },
   required: ["approval"],
+  additionalProperties: false,
+};
+
+export const NegotiateInputSchema = z
+  .object({
+    needs: z.array(z.enum(ALL_NEEDS)).min(1).max(ALL_NEEDS.length),
+  })
+  .strict();
+
+export const negotiateInputJsonSchema: WebMCPToolInputSchema = {
+  type: "object",
+  properties: {
+    needs: {
+      type: "array",
+      items: {
+        type: "string",
+        enum: [...ALL_NEEDS],
+      },
+      minItems: 1,
+    },
+  },
+  required: ["needs"],
   additionalProperties: false,
 };

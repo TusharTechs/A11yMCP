@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import StorefrontFixture from "@/components/fixture/StorefrontFixture";
+import { useNegotiationState } from "@/hooks/use-negotiation-state";
+import { useRemediationState } from "@/hooks/use-remediation-state";
 import { getFixtureRoot } from "@/lib/accessibility/manifest";
+import { PROFILE_PRESETS } from "@/lib/accessibility/profiles";
 import {
   executeA11yTool,
   getLocalTools,
@@ -10,14 +14,18 @@ import {
   type ToolResult,
 } from "@/lib/webmcp/runtime";
 import {
-  registerPhase2ToolsOnce,
-  setPhase2Callbacks,
-  type Phase2EventInput,
+  registerWebMCPToolsOnce,
+  setAgentCallbacks,
+  type AgentEventInput,
 } from "@/lib/webmcp/tools";
-import { useRemediationState } from "@/hooks/use-remediation-state";
-import type { AuditResult, RemediationCategory } from "@/types/accessibility";
+import {
+  ALL_NEEDS,
+  type AccessibilityNeed,
+  type AuditResult,
+  type RemediationCategory,
+} from "@/types/accessibility";
 
-interface UiEvent extends Phase2EventInput {
+interface UiEvent extends AgentEventInput {
   id: string;
   timestamp: string;
 }
@@ -40,6 +48,13 @@ const AUDIT_TOOLS = [
   "audit_form_associations",
   "audit_focus_visibility",
 ] as const;
+
+const APPLY_ORDER: RemediationCategory[] = [
+  "keyboard_navigation",
+  "focus_management",
+  "accessible_names",
+  "form_association",
+];
 
 const CATEGORIES: RemediationCategory[] = [
   "accessible_names",
@@ -66,9 +81,10 @@ export default function Home() {
   );
 
   const remediation = useRemediationState();
+  const negotiation = useNegotiationState();
 
   useEffect(() => {
-    setPhase2Callbacks({
+    setAgentCallbacks({
       logEvent: (event) => {
         setEvents((prev) =>
           [
@@ -84,7 +100,7 @@ export default function Home() {
       getRoot: () => getFixtureRoot(),
     });
 
-    registerPhase2ToolsOnce();
+    registerWebMCPToolsOnce();
     setSupported(isWebMCPSupported());
 
     setTools(
@@ -107,7 +123,8 @@ export default function Home() {
         result: {
           ok: false,
           error: {
-            message: error instanceof Error ? error.message : "Unexpected error",
+            message:
+              error instanceof Error ? error.message : "Unexpected error",
           },
         },
       });
@@ -126,7 +143,10 @@ export default function Home() {
 
   async function runAllAudits(): Promise<void> {
     const results = await refreshAudits();
-    setLastExecution({ tool: "run_all_audits", result: { ok: true, data: results } });
+    setLastExecution({
+      tool: "run_all_audits",
+      result: { ok: true, data: results },
+    });
   }
 
   async function runAndRefresh(name: string, input: unknown): Promise<void> {
@@ -134,14 +154,50 @@ export default function Home() {
     await refreshAudits();
   }
 
+  async function runNegotiation(needs: AccessibilityNeed[]): Promise<void> {
+    await runTool("negotiate_accessibility_profile", { needs });
+  }
+
+  function handlePreferencesSubmit(
+    event: FormEvent<HTMLFormElement>
+  ): void {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const needs = data
+      .getAll("needs")
+      .map((value) => String(value))
+      .filter((value): value is AccessibilityNeed =>
+        (ALL_NEEDS as readonly string[]).includes(value)
+      );
+    if (needs.length === 0) return;
+    void runNegotiation(needs);
+  }
+
+  async function approveAndApply(): Promise<void> {
+    const profile = negotiation.lastNegotiation;
+    if (!profile) return;
+
+    for (const category of APPLY_ORDER) {
+      const item = profile.accepted.find((a) => a.capability === category);
+      if (item) {
+        await runTool(item.remediationTool, { approval: true });
+      }
+    }
+
+    await refreshAudits();
+  }
+
   const allPass = auditSummary?.every((audit) => audit.pass) ?? false;
+  const lastNegotiation = negotiation.lastNegotiation;
+  const partialAccepted =
+    lastNegotiation?.accepted.filter((a) => a.status === "partial") ?? [];
 
   return (
     <main>
-      <h1>A11yMCP — Phase 2 Accessibility Engine</h1>
+      <h1>A11yMCP — Phase 3 Negotiation</h1>
       <p className="muted">
-        Deterministic snapshot, audits, site-declared remediation, verification,
-        and rollback on a controlled NOMA fixture.
+        Human needs are negotiated against site-declared capabilities. Accepted
+        capabilities drive remediation; rejected needs are reported honestly.
       </p>
 
       <section className="panel" aria-live="polite">
@@ -156,6 +212,115 @@ export default function Home() {
             ? "This browser exposes WebMCP tool registration."
             : "Local tool execution still works, but official verification requires a WebMCP-enabled Chrome build."}
         </p>
+      </section>
+
+      <section className="panel">
+        <h2>User need and negotiation</h2>
+
+        <p className="group-label">Presets</p>
+        <div className="button-row">
+          {PROFILE_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => runNegotiation(preset.needs)}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+
+        <p className="group-label">Custom preference form</p>
+        <form
+          toolname="submit_accessibility_preferences"
+          tooldescription="Submit the accessibility needs of the user so the site can negotiate an accessibility profile."
+          onSubmit={handlePreferencesSubmit}
+          className="pref-form"
+        >
+          {ALL_NEEDS.map((need) => (
+            <label key={need} className="pref-option">
+              <input
+                type="checkbox"
+                name="needs"
+                value={need}
+                defaultChecked={need === "keyboard_only"}
+              />
+              {need.replaceAll("_", " ")}
+            </label>
+          ))}
+          <button type="submit">Negotiate profile</button>
+        </form>
+        <p className="muted negotiation-note">
+          In browsers supporting the WebMCP declarative API, this form is also
+          exposed to agents as the tool submit_accessibility_preferences.
+        </p>
+
+        {lastNegotiation ? (
+          <div>
+            <p className="group-label">Requested</p>
+            <div className="chips">
+              {lastNegotiation.requestedNeeds.map((need) => (
+                <span key={need} className="chip">
+                  {need}
+                </span>
+              ))}
+            </div>
+
+            <p className="group-label">Accepted</p>
+            <div className="chips">
+              {lastNegotiation.accepted.length === 0 ? (
+                <span className="chip">none</span>
+              ) : (
+                lastNegotiation.accepted.map((item) => (
+                  <span
+                    key={item.need}
+                    className={`chip ${
+                      item.status === "supported" ? "chip-pass" : "chip-partial"
+                    }`}
+                  >
+                    {item.need} to {item.capability}
+                    {item.status === "partial" ? " (partial)" : ""}
+                  </span>
+                ))
+              )}
+            </div>
+            {partialAccepted.map((item) => (
+              <p key={item.need} className="muted negotiation-note">
+                Partial: {item.limitation}
+              </p>
+            ))}
+
+            <p className="group-label">Rejected</p>
+            <div className="chips">
+              {lastNegotiation.rejected.length === 0 ? (
+                <span className="chip">none</span>
+              ) : (
+                lastNegotiation.rejected.map((item) => (
+                  <span key={item.need} className="chip chip-fail">
+                    {item.need}
+                  </span>
+                ))
+              )}
+            </div>
+            {lastNegotiation.rejected.map((item) => (
+              <p key={item.need} className="muted negotiation-note">
+                {item.need}: {item.reason}
+              </p>
+            ))}
+
+            <div className="button-row">
+              <button
+                type="button"
+                disabled={!approval || lastNegotiation.accepted.length === 0}
+                onClick={approveAndApply}
+              >
+                Approve and apply accepted capabilities
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="muted">No negotiation yet.</p>
+        )}
       </section>
 
       <div className="grid">
@@ -183,7 +348,9 @@ export default function Home() {
             {CATEGORIES.map((category) => (
               <span
                 key={category}
-                className={`chip ${remediation.applied[category] ? "chip-pass" : ""}`}
+                className={`chip ${
+                  remediation.applied[category] ? "chip-pass" : ""
+                }`}
               >
                 {category}: {remediation.applied[category] ? "applied" : "off"}
               </span>
@@ -206,13 +373,22 @@ export default function Home() {
 
           <p className="group-label">Discovery</p>
           <div className="button-row">
-            <button type="button" onClick={() => runTool("get_accessibility_capabilities", {})}>
+            <button
+              type="button"
+              onClick={() => runTool("get_accessibility_capabilities", {})}
+            >
               Capabilities
             </button>
-            <button type="button" onClick={() => runTool("get_accessibility_state", {})}>
+            <button
+              type="button"
+              onClick={() => runTool("get_accessibility_state", {})}
+            >
               State
             </button>
-            <button type="button" onClick={() => runTool("inspect_accessibility_tree", {})}>
+            <button
+              type="button"
+              onClick={() => runTool("inspect_accessibility_tree", {})}
+            >
               Tree
             </button>
           </div>
@@ -222,42 +398,80 @@ export default function Home() {
             <button type="button" onClick={runAllAudits}>
               Run all audits
             </button>
-            <button type="button" onClick={() => runTool("audit_keyboard_navigation", {})}>
+            <button
+              type="button"
+              onClick={() => runTool("audit_keyboard_navigation", {})}
+            >
               Keyboard
             </button>
-            <button type="button" onClick={() => runTool("audit_accessible_names", {})}>
+            <button
+              type="button"
+              onClick={() => runTool("audit_accessible_names", {})}
+            >
               Names
             </button>
-            <button type="button" onClick={() => runTool("audit_form_associations", {})}>
+            <button
+              type="button"
+              onClick={() => runTool("audit_form_associations", {})}
+            >
               Forms
             </button>
-            <button type="button" onClick={() => runTool("audit_focus_visibility", {})}>
+            <button
+              type="button"
+              onClick={() => runTool("audit_focus_visibility", {})}
+            >
               Focus
             </button>
           </div>
 
           <p className="group-label">Remediation</p>
           <div className="button-row">
-            <button type="button" onClick={() => runAndRefresh("repair_accessible_names", { approval })}>
+            <button
+              type="button"
+              onClick={() =>
+                runAndRefresh("repair_accessible_names", { approval })
+              }
+            >
               Repair names
             </button>
-            <button type="button" onClick={() => runAndRefresh("repair_keyboard_navigation", { approval })}>
+            <button
+              type="button"
+              onClick={() =>
+                runAndRefresh("repair_keyboard_navigation", { approval })
+              }
+            >
               Repair keyboard
             </button>
-            <button type="button" onClick={() => runAndRefresh("repair_form_associations", { approval })}>
+            <button
+              type="button"
+              onClick={() =>
+                runAndRefresh("repair_form_associations", { approval })
+              }
+            >
               Repair forms
             </button>
-            <button type="button" onClick={() => runAndRefresh("repair_focus_management", { approval })}>
+            <button
+              type="button"
+              onClick={() =>
+                runAndRefresh("repair_focus_management", { approval })
+              }
+            >
               Repair focus
             </button>
-            <button type="button" onClick={() => runAndRefresh("rollback_all_remediations", {})}>
+            <button
+              type="button"
+              onClick={() => runAndRefresh("rollback_all_remediations", {})}
+            >
               Rollback all
             </button>
           </div>
 
           <p className="group-label">Verification</p>
           <div className="button-row">
-            <button type="button" onClick={() => runTool("verify_accessibility_profile", {})}>
+            <button
+              type="button"
+              onClick={() => runTool("verify_accessibility_profile", {})}
+            >
               Verify
             </button>
           </div>
@@ -276,7 +490,9 @@ export default function Home() {
                 {audit.title}:{" "}
                 {audit.pass
                   ? "pass"
-                  : `${audit.violations.length} violation${audit.violations.length === 1 ? "" : "s"}`}
+                  : `${audit.violations.length} violation${
+                      audit.violations.length === 1 ? "" : "s"
+                    }`}
               </span>
             ))}
             <span className={`chip ${allPass ? "chip-pass" : "chip-fail"}`}>
@@ -292,7 +508,9 @@ export default function Home() {
               )}
             </pre>
           ) : (
-            <p className="muted">No violations. The fixture is task-accessible.</p>
+            <p className="muted">
+              No violations. The fixture is task-accessible.
+            </p>
           )}
         </section>
       ) : null}
