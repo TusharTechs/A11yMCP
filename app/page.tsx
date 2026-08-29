@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import AgentPanel from "@/components/agent/AgentPanel";
 import StorefrontFixture from "@/components/fixture/StorefrontFixture";
 import { useCommerceState } from "@/hooks/use-commerce-state";
 import { useNegotiationState } from "@/hooks/use-negotiation-state";
 import { useRemediationState } from "@/hooks/use-remediation-state";
 import { getFixtureRoot } from "@/lib/accessibility/manifest";
-import { PROFILE_PRESETS } from "@/lib/accessibility/profiles";
+import { APPLY_ORDER, PROFILE_PRESETS } from "@/lib/accessibility/profiles";
 import {
   executeA11yTool,
   getLocalTools,
@@ -49,13 +50,6 @@ const AUDIT_TOOLS = [
   "audit_form_associations",
   "audit_focus_visibility",
 ] as const;
-
-const APPLY_ORDER: RemediationCategory[] = [
-  "keyboard_navigation",
-  "focus_management",
-  "accessible_names",
-  "form_association",
-];
 
 const CATEGORIES: RemediationCategory[] = [
   "accessible_names",
@@ -209,10 +203,10 @@ export default function Home() {
 
   return (
     <main>
-      <h1>A11yMCP — Phase 4 Task Completion</h1>
+      <h1>A11yMCP — Phase 5 Agent Workflow</h1>
       <p className="muted">
-        Accessibility negotiation plus a deterministic ecommerce task: search,
-        variant selection, cart, checkout, and order completion.
+        A deterministic guided agent drives the full chain: intent, discovery,
+        audit, negotiation, approval, remediation, verification, task.
       </p>
 
       <section className="panel" aria-live="polite">
@@ -228,6 +222,8 @@ export default function Home() {
             : "Local tool execution still works, but official verification requires a WebMCP-enabled Chrome build."}
         </p>
       </section>
+
+      <AgentPanel />
 
       <section className="panel">
         <h2>User need and negotiation</h2>

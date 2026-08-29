@@ -22,6 +22,13 @@ export const NEED_TO_CAPABILITY: Record<
   large_targets: null,
 };
 
+export const APPLY_ORDER: RemediationCategory[] = [
+  "keyboard_navigation",
+  "focus_management",
+  "accessible_names",
+  "form_association",
+];
+
 export const PROFILE_PRESETS: UserProfile[] = [
   {
     id: "keyboard-only",

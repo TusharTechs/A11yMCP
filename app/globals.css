@@ -411,3 +411,83 @@ button:disabled {
   border-radius: 10px;
   padding: 12px;
 }
+
+/* Phase 5 — agent stream */
+
+.agent-stream {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 12px;
+  max-height: 360px;
+  overflow-y: auto;
+  display: grid;
+  gap: 6px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.agent-stream li {
+  border-left: 3px solid var(--border);
+  padding-left: 8px;
+  white-space: pre-wrap;
+}
+
+.stream-user {
+  border-left-color: #2563eb;
+}
+
+.stream-agent {
+  border-left-color: #16a34a;
+}
+
+.stream-tool {
+  border-left-color: #9333ea;
+}
+
+.stream-result {
+  border-left-color: #0d9488;
+}
+
+.stream-failure {
+  border-left-color: #dc2626;
+  color: #991b1b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .stream-failure {
+    color: #f87171;
+  }
+}
+
+.stream-status {
+  border-left-color: #d97706;
+}
+
+.stream-kind {
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-right: 6px;
+}
+
+.trust-box {
+  border: 1px solid #d97706;
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.trust-box h3 {
+  margin: 0;
+}
+
+.trust-box p {
+  margin: 0;
+  font-size: 13px;
+}
