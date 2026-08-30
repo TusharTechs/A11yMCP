@@ -4,6 +4,10 @@ export type ToolResult =
   | { ok: true; data: unknown }
   | { ok: false; error: { message: string; issues?: unknown[] } };
 
+export interface ToolExecutionContext {
+  signal?: AbortSignal;
+}
+
 export interface ToolDefinition<TInput> {
   name: string;
   title: string;
@@ -11,7 +15,10 @@ export interface ToolDefinition<TInput> {
   inputSchema: WebMCPToolInputSchema;
   annotations?: WebMCPToolAnnotations;
   schema: z.ZodType<TInput>;
-  run: (input: TInput) => Promise<unknown> | unknown;
+  run: (
+    input: TInput,
+    context?: ToolExecutionContext
+  ) => Promise<unknown> | unknown;
 }
 
 interface StoredTool {
@@ -21,7 +28,18 @@ interface StoredTool {
   inputSchema: WebMCPToolInputSchema;
   annotations?: WebMCPToolAnnotations;
   schema: z.ZodTypeAny;
-  run: (input: unknown) => Promise<unknown> | unknown;
+  run: (
+    input: unknown,
+    context?: ToolExecutionContext
+  ) => Promise<unknown> | unknown;
+}
+
+export interface BrowserToolInfo {
+  name: string;
+  description?: string;
+  inputSchema?: unknown;
+  annotations?: unknown;
+  origin?: string;
 }
 
 const toolRegistry = new Map<string, StoredTool>();
@@ -31,13 +49,7 @@ function normalizeInput(input: unknown): unknown {
 }
 
 function errorResult(message: string, issues?: unknown[]): ToolResult {
-  return {
-    ok: false,
-    error: {
-      message,
-      issues,
-    },
-  };
+  return { ok: false, error: { message, issues } };
 }
 
 export function registerA11yTool<TInput>(
@@ -50,7 +62,7 @@ export function registerA11yTool<TInput>(
     inputSchema: definition.inputSchema,
     annotations: definition.annotations,
     schema: definition.schema,
-    run: definition.run as (input: unknown) => Promise<unknown> | unknown,
+    run: definition.run as StoredTool["run"],
   };
 
   toolRegistry.set(stored.name, stored);
@@ -66,7 +78,8 @@ export function registerA11yTool<TInput>(
         description: stored.description,
         inputSchema: stored.inputSchema,
         annotations: stored.annotations,
-        execute: async (input: unknown) => executeA11yTool(stored.name, input),
+        execute: async (input: unknown, context?: WebMCPToolExecuteContext) =>
+          executeA11yTool(stored.name, input, { signal: context?.signal }),
       });
     } catch (error) {
       console.error(
@@ -79,7 +92,8 @@ export function registerA11yTool<TInput>(
 
 export async function executeA11yTool(
   name: string,
-  rawInput: unknown
+  rawInput: unknown,
+  options?: ToolExecutionContext
 ): Promise<ToolResult> {
   const tool = toolRegistry.get(name);
 
@@ -94,11 +108,8 @@ export async function executeA11yTool(
   }
 
   try {
-    const data = await tool.run(parsed.data);
-    return {
-      ok: true,
-      data,
-    };
+    const data = await tool.run(parsed.data, { signal: options?.signal });
+    return { ok: true, data };
   } catch (error) {
     return errorResult(
       error instanceof Error ? error.message : `Execution failed for ${name}`
@@ -128,4 +139,59 @@ export function isWebMCPSupported(): boolean {
     typeof document !== "undefined" &&
     typeof document.modelContext?.registerTool === "function"
   );
+}
+
+/**
+ * Browser-visible tools via the real WebMCP runtime.
+ * Returns null when WebMCP is unavailable; never conflated with the
+ * local registry.
+ */
+export async function getBrowserTools(): Promise<BrowserToolInfo[] | null> {
+  if (typeof document === "undefined") return null;
+  const mc = document.modelContext;
+  if (!mc || typeof mc.getTools !== "function") return null;
+
+  try {
+    const raw = await mc.getTools();
+    if (!Array.isArray(raw)) return null;
+    return (raw as Array<Record<string, unknown>>).map((tool) => ({
+      name: String(tool.name ?? "unknown"),
+      description:
+        typeof tool.description === "string" ? tool.description : undefined,
+      inputSchema: tool.inputSchema,
+      annotations: tool.annotations,
+      origin: typeof tool.origin === "string" ? tool.origin : undefined,
+    }));
+  } catch {
+    return null;
+  }
+}
+
+/** Executes through the browser's WebMCP executeTool when available. */
+export async function executeBrowserTool(
+  name: string,
+  input: unknown
+): Promise<unknown | null> {
+  if (typeof document === "undefined") return null;
+  const mc = document.modelContext;
+  if (!mc || typeof mc.executeTool !== "function") return null;
+
+  try {
+    return await mc.executeTool(name, input);
+  } catch (error) {
+    return {
+      browserError: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export function subscribeToolChange(listener: () => void): () => void {
+  if (typeof document === "undefined") return () => {};
+  const mc = document.modelContext;
+  if (!mc || typeof mc.addEventListener !== "function") return () => {};
+
+  mc.addEventListener("toolchange", listener);
+  return () => {
+    mc.removeEventListener?.("toolchange", listener);
+  };
 }

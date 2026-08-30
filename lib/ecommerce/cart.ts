@@ -215,6 +215,10 @@ export function placeOrder(sessionId: string): {
     return { success: false, message: "Unknown checkout session." };
   }
 
+  if (snapshot.order) {
+    return { success: false, message: "Order already placed. Start over first." };
+  }
+
   if (!snapshot.checkoutFilled) {
     const result = validateCheckoutValues(snapshot.checkoutValues);
     if (!result.success) {

@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import AgentPanel from "@/components/agent/AgentPanel";
 import LiveStorefront from "@/components/fixture/LiveStorefront";
 import OriginalStorefront from "@/components/fixture/OriginalStorefront";
+import ChainVerification from "@/components/webmcp/ChainVerification";
 import { useAgentState } from "@/hooks/use-agent-state";
 import { useCommerceState } from "@/hooks/use-commerce-state";
 import { useEventLog } from "@/hooks/use-event-log";
@@ -210,6 +211,8 @@ export default function DemoPage() {
           ) : null}
         </section>
       </div>
+      
+      <ChainVerification />
 
       {auditSummary ? (
         <section className="panel">

@@ -171,12 +171,31 @@ export function auditFormAssociations(root: Element): AuditResult {
   };
 }
 
-export function auditFocusVisibility(root: Element): AuditResult {
+export function auditFocusVisibility(
+  root: Element,
+  signal?: AbortSignal
+): AuditResult {
   const violations: AccessibilityViolation[] = [];
   const focusables = Array.from(root.querySelectorAll("*")).filter(isFocusable);
   const active = document.activeElement;
 
   for (const el of focusables) {
+    if (signal?.aborted) {
+      violations.push({
+        id: `aborted:${getSelector(el)}`,
+        rule: "aborted",
+        severity: "low",
+        selector: getSelector(el),
+        message: "Audit aborted by AbortSignal.",
+      });
+      return {
+        id: "focus_visibility",
+        title: "Focus visibility",
+        pass: false,
+        violations,
+      };
+    }
+
     (el as HTMLElement).focus({ preventScroll: true });
     const style = window.getComputedStyle(el);
     const outlineVisible =

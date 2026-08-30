@@ -296,9 +296,9 @@ export function registerWebMCPToolsOnce(): void {
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
-    run: async () => {
+    run: async (_input: unknown, context?: { signal?: AbortSignal }) => {
       const root = requireRoot();
-      const result = auditFocusVisibility(root);
+      const result = auditFocusVisibility(root, context?.signal);
       logEvent(
         "AUDIT_COMPLETED",
         "audit_focus_visibility",
