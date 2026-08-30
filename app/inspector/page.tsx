@@ -43,6 +43,49 @@ const SAMPLE_INPUTS: Record<string, string> = {
   place_order: '{"sessionId":"checkout-1","confirmation":true}',
 };
 
+const GROUPS: Array<{ title: string; names: string[] }> = [
+    {
+      title: "Discovery and state",
+      names: [
+        "get_accessibility_capabilities",
+        "get_accessibility_state",
+        "inspect_accessibility_tree",
+      ],
+    },
+    { title: "Negotiation", names: ["negotiate_accessibility_profile"] },
+    {
+      title: "Audits",
+      names: [
+        "audit_keyboard_navigation",
+        "audit_accessible_names",
+        "audit_form_associations",
+        "audit_focus_visibility",
+      ],
+    },
+    {
+      title: "Remediation (approval-gated)",
+      names: [
+        "repair_accessible_names",
+        "repair_keyboard_navigation",
+        "repair_form_associations",
+        "repair_focus_management",
+        "repair_reduced_motion",
+        "rollback_all_remediations",
+      ],
+    },
+    { title: "Verification", names: ["verify_accessibility_profile"] },
+    {
+      title: "Commerce",
+      names: [
+        "search_products",
+        "add_product_to_cart",
+        "begin_checkout",
+        "fill_checkout_form",
+        "place_order",
+      ],
+    },
+  ];
+
 export default function InspectorPage() {
   const [supported] = useState(isWebMCPSupported);
   const [browserTools, setBrowserTools] = useState<BrowserToolInfo[] | null>(
@@ -153,48 +196,57 @@ export default function InspectorPage() {
         </p>
       </section>
 
-      {localTools.map((tool) => (
-        <section className="panel tool-card" key={tool.name}>
-          <h2>
-            {tool.name}{" "}
-            <span className="chip">
-              {tool.annotations?.readOnlyHint ? "read-only" : "state-changing"}
-            </span>
-          </h2>
-          <p className="muted">{tool.description}</p>
-          <pre className="code">
-            {JSON.stringify(tool.inputSchema, null, 2)}
-          </pre>
-          <label className="group-label" htmlFor={`input-${tool.name}`}>
-            Input JSON
-          </label>
-          <textarea
-            id={`input-${tool.name}`}
-            className="code tool-input"
-            rows={3}
-            value={inputs[tool.name] ?? "{}"}
-            onChange={(event) =>
-              setInputs((prev) => ({
-                ...prev,
-                [tool.name]: event.target.value,
-              }))
-            }
-          />
-          <div className="button-row">
-            <button
-              type="button"
-              id={`invoke-${tool.name}`}
-              onClick={() => void invoke(tool.name)}
-            >
-              Invoke
-            </button>
-          </div>
-          {results[tool.name] ? (
-            <pre className="code" id={`result-${tool.name}`}>
-              {JSON.stringify(results[tool.name], null, 2)}
-            </pre>
-          ) : null}
-        </section>
+      {GROUPS.map((group) => (
+        <div key={group.title}>
+          <h2 className="group-title">{group.title}</h2>
+          {localTools
+            .filter((tool) => group.names.includes(tool.name))
+            .map((tool) => (
+              <section className="panel tool-card" key={tool.name}>
+                <h2>
+                  {tool.name}{" "}
+                  <span className="chip">
+                    {tool.annotations?.readOnlyHint
+                      ? "read-only"
+                      : "state-changing"}
+                  </span>
+                </h2>
+                <p className="muted">{tool.description}</p>
+                <pre className="code">
+                  {JSON.stringify(tool.inputSchema, null, 2)}
+                </pre>
+                <label className="group-label" htmlFor={`input-${tool.name}`}>
+                  Input JSON
+                </label>
+                <textarea
+                  id={`input-${tool.name}`}
+                  className="code tool-input"
+                  rows={3}
+                  value={inputs[tool.name] ?? "{}"}
+                  onChange={(event) =>
+                    setInputs((prev) => ({
+                      ...prev,
+                      [tool.name]: event.target.value,
+                    }))
+                  }
+                />
+                <div className="button-row">
+                  <button
+                    type="button"
+                    id={`invoke-${tool.name}`}
+                    onClick={() => void invoke(tool.name)}
+                  >
+                    Invoke
+                  </button>
+                </div>
+                {results[tool.name] ? (
+                  <pre className="code" id={`result-${tool.name}`}>
+                    {JSON.stringify(results[tool.name], null, 2)}
+                  </pre>
+                ) : null}
+              </section>
+            ))}
+        </div>
       ))}
 
       <section className="panel" aria-live="polite">

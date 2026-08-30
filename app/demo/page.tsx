@@ -60,6 +60,37 @@ export default function DemoPage() {
   const [verification, setVerification] = useState<VerificationResult | null>(
     null
   );
+  const [needsSel, setNeedsSel] = useState<AccessibilityNeed[]>([
+    "keyboard_only",
+  ]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("a11ymcp:profile");
+      if (!raw) return;
+      const saved = JSON.parse(raw) as {
+        site?: SiteId;
+        needs?: AccessibilityNeed[];
+      };
+      if (saved.site && saved.site !== getSiteId()) setSite(saved.site);
+      if (Array.isArray(saved.needs) && saved.needs.length > 0) {
+        setNeedsSel(saved.needs);
+      }
+    } catch {
+      /* ignore corrupted storage */
+    }
+  }, []);
+
+  function persistProfile(nextNeeds: AccessibilityNeed[], nextSite: SiteId) {
+    try {
+      window.localStorage.setItem(
+        "a11ymcp:profile",
+        JSON.stringify({ site: nextSite, needs: nextNeeds })
+      );
+    } catch {
+      /* storage unavailable */
+    }
+  }
 
   useEffect(() => {
     return subscribeSite(() => setSiteId(getSiteId()));
@@ -88,6 +119,7 @@ export default function DemoPage() {
   async function switchSite(id: SiteId): Promise<void> {
     await executeA11yTool("rollback_all_remediations", {});
     setSite(id);
+    persistProfile(needsSel, id);
   }
 
   async function exportEvidence(): Promise<void> {
@@ -114,17 +146,15 @@ export default function DemoPage() {
     });
   }
 
-  function handlePreferencesSubmit(event: FormEvent<HTMLFormElement>): void {
+  function handlePreferencesSubmit(
+    event: FormEvent<HTMLFormElement>
+  ): void {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const needs = data
-      .getAll("needs")
-      .map((value) => String(value))
-      .filter((value): value is AccessibilityNeed =>
-        (ALL_NEEDS as readonly string[]).includes(value)
-      );
-    if (needs.length === 0) return;
-    void executeA11yTool("negotiate_accessibility_profile", { needs });
+    if (needsSel.length === 0) return;
+    persistProfile(needsSel, siteId);
+    void executeA11yTool("negotiate_accessibility_profile", {
+      needs: needsSel,
+    });
   }
 
   const allPass = auditSummary?.every((audit) => audit.pass) ?? false;
@@ -135,7 +165,7 @@ export default function DemoPage() {
   const lastNegotiation = negotiation.lastNegotiation;
   const utterance = agent.scenarioId
     ? getScenario(agent.scenarioId).utterance
-    : "Run a scenario in the agent panel, or set your needs below.";
+    : "I use keyboard-only navigation. Help me buy these shoes.";
 
   return (
     <main id="main">
@@ -143,6 +173,11 @@ export default function DemoPage() {
         <div>
           <p className="group-label">User need</p>
           <p className="need-text">{utterance}</p>
+          <p className="muted">
+            What am I looking at? 1) The agent negotiates with the site's
+            declared capabilities. 2) You approve reversible fixes. 3) The
+            site adapts, verifies, and completes the task.
+          </p>
         </div>
 
         <div className="chips">
@@ -184,7 +219,14 @@ export default function DemoPage() {
                 type="checkbox"
                 name="needs"
                 value={need}
-                defaultChecked={need === "keyboard_only"}
+                checked={needsSel.includes(need)}
+                onChange={(event) => {
+                  const next = event.target.checked
+                    ? [...needsSel, need]
+                    : needsSel.filter((item) => item !== need);
+                  setNeedsSel(next);
+                  persistProfile(next, siteId);
+                }}
               />
               {need.replaceAll("_", " ")}
             </label>

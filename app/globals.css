@@ -647,3 +647,41 @@ button:disabled {
 .fixture[data-motion="reduced"] .promo {
   animation: none;
 }
+
+/* P2 — premium polish */
+
+h1 {
+  letter-spacing: -0.02em;
+}
+
+.group-title {
+  margin: 18px 0 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.topbar {
+  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+}
+
+.chip,
+.code {
+  font-variant-numeric: tabular-nums;
+}
+
+.panel {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+}
+
+.landing .hero h1 {
+  font-size: 44px;
+}
+
+@media (min-width: 1200px) {
+  .triad {
+    gap: 20px;
+  }
+}
