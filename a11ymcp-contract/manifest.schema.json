@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://a11ymcp.dev/contract/manifest.schema.json",
+  "title": "A11yMCP Site Accessibility Manifest",
+  "description": "A11yMCP prototype convention / reference contract. NOT an official WebMCP standard.",
+  "type": "object",
+  "required": ["id", "site", "rootSelector", "capabilities", "notDeclared", "directives"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string" },
+    "site": { "type": "string" },
+    "rootSelector": { "type": "string" },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "status", "auditTool", "repairTool"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": ["keyboard_navigation", "focus_management", "accessible_names", "form_association", "reduced_motion", "contrast", "large_targets"]
+          },
+          "title": { "type": "string" },
+          "status": { "type": "string", "enum": ["supported", "partial"] },
+          "limitation": { "type": "string" },
+          "auditTool": { "type": "string" },
+          "repairTool": { "type": "string" }
+        }
+      }
+    },
+    "notDeclared": { "type": "array", "items": { "type": "string" } },
+    "directives": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["selector", "change"],
+          "additionalProperties": false,
+          "properties": {
+            "selector": { "type": "string" },
+            "change": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

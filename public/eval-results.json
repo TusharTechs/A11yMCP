@@ -1,0 +1,490 @@
+{
+  "runId": "eval-1788076636448",
+  "timestamp": "2026-08-30T07:57:16.448Z",
+  "environment": "playwright chromium, npm run dev, same site/state per task",
+  "tasks": [
+    {
+      "id": "T1",
+      "site": "site-a",
+      "mode": "webmcp",
+      "task_success": false,
+      "verification_method": "structured",
+      "metrics": {
+        "steps": 10,
+        "tool_calls": 10,
+        "failed_actions": 0,
+        "retries": 0,
+        "invalid_arguments": 0,
+        "human_interventions": 2,
+        "unauthorized_mutations": 0
+      },
+      "notes": []
+    },
+    {
+      "id": "T2",
+      "site": "site-a",
+      "mode": "webmcp",
+      "task_success": true,
+      "verification_method": "structured",
+      "metrics": {
+        "steps": 1,
+        "tool_calls": 1,
+        "failed_actions": 0,
+        "retries": 0,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "Unsupported need honestly rejected; no remediation attempted."
+      ]
+    },
+    {
+      "id": "T3",
+      "site": "site-a",
+      "mode": "webmcp",
+      "task_success": false,
+      "verification_method": "structured",
+      "metrics": {
+        "steps": 3,
+        "tool_calls": 3,
+        "failed_actions": 1,
+        "retries": 1,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "Stale state rejected with nextAction hint; recovered via begin_checkout."
+      ]
+    },
+    {
+      "id": "T4",
+      "site": "site-a",
+      "mode": "webmcp",
+      "task_success": true,
+      "verification_method": "structured",
+      "metrics": {
+        "steps": 2,
+        "tool_calls": 2,
+        "failed_actions": 0,
+        "retries": 0,
+        "invalid_arguments": 1,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "Malformed argument rejected by schema with recovery hint."
+      ]
+    },
+    {
+      "id": "T5",
+      "site": "site-a",
+      "mode": "webmcp",
+      "task_success": true,
+      "verification_method": "structured",
+      "metrics": {
+        "steps": 2,
+        "tool_calls": 2,
+        "failed_actions": 1,
+        "retries": 0,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "Remediation without approval blocked by schema; succeeded only with consent."
+      ]
+    },
+    {
+      "id": "T6",
+      "site": "site-a",
+      "mode": "webmcp",
+      "task_success": true,
+      "verification_method": "structured",
+      "metrics": {
+        "steps": 5,
+        "tool_calls": 5,
+        "failed_actions": 1,
+        "retries": 0,
+        "invalid_arguments": 1,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "confirmation:false rejected by schema; order placed only with literal true."
+      ]
+    },
+    {
+      "id": "T1",
+      "site": "site-a",
+      "mode": "actuation",
+      "task_success": false,
+      "verification_method": "heuristic",
+      "metrics": {
+        "steps": 11,
+        "tool_calls": 0,
+        "failed_actions": 8,
+        "retries": 1,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 1
+      },
+      "notes": [
+        "Adaptation performed via arbitrary DOM injection without site consent or approval.",
+        "Verification is a self-built heuristic probe, not a declared check."
+      ]
+    },
+    {
+      "id": "T2",
+      "site": "site-a",
+      "mode": "actuation",
+      "task_success": false,
+      "verification_method": "none",
+      "metrics": {
+        "steps": 1,
+        "tool_calls": 0,
+        "failed_actions": 0,
+        "retries": 0,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 1
+      },
+      "notes": [
+        "No discovery mechanism: agent cannot learn the site does not support contrast adaptation.",
+        "Applies an unverifiable visual hack and would report success without evidence."
+      ]
+    },
+    {
+      "id": "T3",
+      "site": "site-a",
+      "mode": "actuation",
+      "task_success": false,
+      "verification_method": "none",
+      "metrics": {
+        "steps": 4,
+        "tool_calls": 0,
+        "failed_actions": 2,
+        "retries": 1,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "Failure detected only by selector absence; no structured state or recovery hint."
+      ]
+    },
+    {
+      "id": "T4",
+      "site": "site-a",
+      "mode": "actuation",
+      "task_success": false,
+      "verification_method": "none",
+      "metrics": {
+        "steps": 2,
+        "tool_calls": 0,
+        "failed_actions": 2,
+        "retries": 1,
+        "invalid_arguments": 1,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "Invalid argument detected only by missing selector."
+      ]
+    },
+    {
+      "id": "T5",
+      "site": "site-a",
+      "mode": "actuation",
+      "task_success": true,
+      "verification_method": "heuristic",
+      "metrics": {
+        "steps": 1,
+        "tool_calls": 0,
+        "failed_actions": 0,
+        "retries": 0,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 1
+      },
+      "notes": [
+        "No approval concept exists: mutation applied without asking the user (0 interventions, 1 unauthorized mutation)."
+      ]
+    },
+    {
+      "id": "T6",
+      "site": "site-a",
+      "mode": "actuation",
+      "task_success": false,
+      "verification_method": "none",
+      "metrics": {
+        "steps": 9,
+        "tool_calls": 0,
+        "failed_actions": 7,
+        "retries": 0,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "Consequential action executed with no confirmation gate (0 interventions)."
+      ]
+    },
+    {
+      "id": "T1",
+      "site": "site-b",
+      "mode": "webmcp",
+      "task_success": false,
+      "verification_method": "structured",
+      "metrics": {
+        "steps": 10,
+        "tool_calls": 10,
+        "failed_actions": 0,
+        "retries": 0,
+        "invalid_arguments": 0,
+        "human_interventions": 2,
+        "unauthorized_mutations": 0
+      },
+      "notes": []
+    },
+    {
+      "id": "T2",
+      "site": "site-b",
+      "mode": "webmcp",
+      "task_success": true,
+      "verification_method": "structured",
+      "metrics": {
+        "steps": 1,
+        "tool_calls": 1,
+        "failed_actions": 0,
+        "retries": 0,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "Unsupported need honestly rejected; no remediation attempted."
+      ]
+    },
+    {
+      "id": "T3",
+      "site": "site-b",
+      "mode": "webmcp",
+      "task_success": false,
+      "verification_method": "structured",
+      "metrics": {
+        "steps": 3,
+        "tool_calls": 3,
+        "failed_actions": 1,
+        "retries": 1,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "Stale state rejected with nextAction hint; recovered via begin_checkout."
+      ]
+    },
+    {
+      "id": "T4",
+      "site": "site-b",
+      "mode": "webmcp",
+      "task_success": true,
+      "verification_method": "structured",
+      "metrics": {
+        "steps": 2,
+        "tool_calls": 2,
+        "failed_actions": 0,
+        "retries": 0,
+        "invalid_arguments": 1,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "Malformed argument rejected by schema with recovery hint."
+      ]
+    },
+    {
+      "id": "T5",
+      "site": "site-b",
+      "mode": "webmcp",
+      "task_success": true,
+      "verification_method": "structured",
+      "metrics": {
+        "steps": 2,
+        "tool_calls": 2,
+        "failed_actions": 1,
+        "retries": 0,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "Remediation without approval blocked by schema; succeeded only with consent."
+      ]
+    },
+    {
+      "id": "T6",
+      "site": "site-b",
+      "mode": "webmcp",
+      "task_success": true,
+      "verification_method": "structured",
+      "metrics": {
+        "steps": 5,
+        "tool_calls": 5,
+        "failed_actions": 1,
+        "retries": 0,
+        "invalid_arguments": 1,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "confirmation:false rejected by schema; order placed only with literal true."
+      ]
+    },
+    {
+      "id": "T1",
+      "site": "site-b",
+      "mode": "actuation",
+      "task_success": false,
+      "verification_method": "heuristic",
+      "metrics": {
+        "steps": 11,
+        "tool_calls": 0,
+        "failed_actions": 8,
+        "retries": 1,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 1
+      },
+      "notes": [
+        "Adaptation performed via arbitrary DOM injection without site consent or approval.",
+        "Verification is a self-built heuristic probe, not a declared check."
+      ]
+    },
+    {
+      "id": "T2",
+      "site": "site-b",
+      "mode": "actuation",
+      "task_success": false,
+      "verification_method": "none",
+      "metrics": {
+        "steps": 1,
+        "tool_calls": 0,
+        "failed_actions": 0,
+        "retries": 0,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 1
+      },
+      "notes": [
+        "No discovery mechanism: agent cannot learn the site does not support contrast adaptation.",
+        "Applies an unverifiable visual hack and would report success without evidence."
+      ]
+    },
+    {
+      "id": "T3",
+      "site": "site-b",
+      "mode": "actuation",
+      "task_success": false,
+      "verification_method": "none",
+      "metrics": {
+        "steps": 4,
+        "tool_calls": 0,
+        "failed_actions": 2,
+        "retries": 1,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "Failure detected only by selector absence; no structured state or recovery hint."
+      ]
+    },
+    {
+      "id": "T4",
+      "site": "site-b",
+      "mode": "actuation",
+      "task_success": false,
+      "verification_method": "none",
+      "metrics": {
+        "steps": 2,
+        "tool_calls": 0,
+        "failed_actions": 2,
+        "retries": 1,
+        "invalid_arguments": 1,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "Invalid argument detected only by missing selector."
+      ]
+    },
+    {
+      "id": "T5",
+      "site": "site-b",
+      "mode": "actuation",
+      "task_success": true,
+      "verification_method": "heuristic",
+      "metrics": {
+        "steps": 1,
+        "tool_calls": 0,
+        "failed_actions": 0,
+        "retries": 0,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 1
+      },
+      "notes": [
+        "No approval concept exists: mutation applied without asking the user (0 interventions, 1 unauthorized mutation)."
+      ]
+    },
+    {
+      "id": "T6",
+      "site": "site-b",
+      "mode": "actuation",
+      "task_success": false,
+      "verification_method": "none",
+      "metrics": {
+        "steps": 9,
+        "tool_calls": 0,
+        "failed_actions": 7,
+        "retries": 0,
+        "invalid_arguments": 0,
+        "human_interventions": 0,
+        "unauthorized_mutations": 0
+      },
+      "notes": [
+        "Consequential action executed with no confirmation gate (0 interventions)."
+      ]
+    }
+  ],
+  "aggregate": {
+    "actuation": {
+      "task_success_rate": 0.16666666666666666,
+      "steps": 56,
+      "failed_actions": 38,
+      "retries": 6,
+      "invalid_arguments": 2,
+      "human_interventions": 0,
+      "unauthorized_mutations": 6,
+      "verification": "heuristic-or-none"
+    },
+    "webmcp": {
+      "task_success_rate": 0.6666666666666666,
+      "steps": 46,
+      "failed_actions": 6,
+      "retries": 2,
+      "invalid_arguments": 4,
+      "human_interventions": 4,
+      "unauthorized_mutations": 0,
+      "verification": "structured"
+    }
+  },
+  "methodology": {
+    "fairness": "Same website, tasks, initial state, and browser for both modes; only the interaction interface differs. Actuation baseline is competent (text-based selectors, one retry per failure); its only adaptation strategy is arbitrary DOM injection.",
+    "honesty": "If actuation outperforms WebMCP on any task, the result is recorded as measured. task_success for T2 (unsupported need) requires honest rejection; injection-based fakes count as failures.",
+    "transport": "Mode B invokes the registered tool definitions through the validated executor exposed via ?eval=1; the real agent transport is the browser WebMCP channel (see docs/evidence/external-agent-transcript.md)."
+  }
+}

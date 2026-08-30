@@ -1,0 +1,18 @@
+{
+  "id": "site-b",
+  "site": "NOMA Store B",
+  "rootSelector": "#noma-fixture",
+  "capabilities": [
+    { "id": "keyboard_navigation", "title": "Keyboard navigation", "status": "supported", "auditTool": "audit_keyboard_navigation", "repairTool": "repair_keyboard_navigation" },
+    { "id": "focus_management", "title": "Focus management", "status": "supported", "auditTool": "audit_focus_visibility", "repairTool": "repair_focus_management" },
+    { "id": "reduced_motion", "title": "Reduced motion", "status": "supported", "auditTool": "audit_reduced_motion", "repairTool": "repair_reduced_motion" }
+  ],
+  "notDeclared": ["high_contrast", "large_targets", "screen_reader_labels", "form_support"],
+  "directives": {
+    "accessible_names": [],
+    "keyboard_navigation": [{ "selector": "[role=\"radio\"]", "change": "tabindex=0 plus keyboard handlers" }],
+    "form_association": [],
+    "focus_management": [{ "selector": "#noma-fixture", "change": "focus token swap" }],
+    "reduced_motion": [{ "selector": "#noma-fixture", "change": "data-motion=reduced" }]
+  }
+}

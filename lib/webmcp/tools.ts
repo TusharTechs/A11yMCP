@@ -209,8 +209,8 @@ export function registerWebMCPToolsOnce(): void {
   registerA11yTool({
     name: "negotiate_accessibility_profile",
     title: "Negotiate accessibility profile",
-    description:
-      "Maps the user's accessibility needs against this site's declared capabilities. Returns accepted capabilities (supported, or partial with a stated limitation) and rejected needs with reasons. Call after get_accessibility_capabilities and BEFORE any repair tool. Mutates session state only (stores the profile); does not change the page. Never call a repair tool for a need this tool rejected.",
+        description:
+          "Maps the user's accessibility needs against this site's declared capabilities. Returns accepted capabilities (supported, or partial with a stated limitation) and rejected needs with reasons. Call after get_accessibility_capabilities and BEFORE any repair tool. Mutates session state only (stores the profile); does not change the page. No approval required; it only records the negotiated profile. Never call a repair tool for a need this tool rejected.",
     inputSchema: negotiateInputJsonSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     schema: NegotiateInputSchema,
@@ -413,8 +413,8 @@ export function registerWebMCPToolsOnce(): void {
   registerA11yTool({
     name: "repair_reduced_motion",
     title: "Repair reduced motion",
-    description:
-      "Applies the site-declared, reversible motion reduction. Requires input.approval=true. Only succeeds on sites that declare the reduced_motion capability; on other sites it returns success:false with an evidence chain explaining the refusal. Mutates the live page; reversible via rollback_all_remediations.",
+        description:
+          "Applies the site-declared, reversible motion reduction. Precondition: the site must declare the reduced_motion capability; call after negotiate_accessibility_profile accepts it. Requires input.approval=true. On sites that do not declare it, returns success:false with an evidence chain explaining the refusal. Mutates the live page; reversible via rollback_all_remediations.",
     inputSchema: approvalInputJsonSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     schema: ApprovalInputSchema,
@@ -585,8 +585,8 @@ export function registerWebMCPToolsOnce(): void {
   registerA11yTool({
     name: "place_order",
     title: "Place order",
-    description:
-      "Consequential action: places the order. Requires input.confirmation to be the literal true (explicit human confirmation) and a filled checkout session; the schema rejects confirmation:false. Returns the order id on success. A second call for the same session fails with 'Order already placed'. Always confirm with the user before calling.",
+        description:
+          "Consequential action: places the order. Precondition: a filled checkout session; call only after the user explicitly confirms. Requires input.confirmation to be the literal true (explicit human confirmation); the schema rejects confirmation:false. Returns the order id on success. A second call for the same session fails with 'Order already placed'.",
     inputSchema: placeOrderInputJsonSchema,
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     schema: PlaceOrderInputSchema,

@@ -1,0 +1,19 @@
+{
+  "id": "site-a",
+  "site": "NOMA Store A",
+  "rootSelector": "#noma-fixture",
+  "capabilities": [
+    { "id": "accessible_names", "title": "Accessible names", "status": "partial", "limitation": "Declared names cover task-critical controls only.", "auditTool": "audit_accessible_names", "repairTool": "repair_accessible_names" },
+    { "id": "keyboard_navigation", "title": "Keyboard navigation", "status": "supported", "auditTool": "audit_keyboard_navigation", "repairTool": "repair_keyboard_navigation" },
+    { "id": "form_association", "title": "Form association", "status": "supported", "auditTool": "audit_form_associations", "repairTool": "repair_form_associations" },
+    { "id": "focus_management", "title": "Focus management", "status": "supported", "auditTool": "audit_focus_visibility", "repairTool": "repair_focus_management" }
+  ],
+  "notDeclared": ["high_contrast", "reduced_motion", "large_targets"],
+  "directives": {
+    "accessible_names": [{ "selector": "[data-a11ymcp-target=\"wishlist\"]", "change": "aria-label=\"Add NOMA Runner to wishlist\"" }],
+    "keyboard_navigation": [{ "selector": "[role=\"radio\"]", "change": "tabindex=0 plus keyboard handlers" }],
+    "form_association": [{ "selector": "#email", "change": "label[for], aria-describedby, role=alert" }],
+    "focus_management": [{ "selector": "#noma-fixture", "change": "focus token swap" }],
+    "reduced_motion": []
+  }
+}

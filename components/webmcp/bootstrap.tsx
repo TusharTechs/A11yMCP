@@ -3,16 +3,12 @@
 import { useEffect } from "react";
 import { getFixtureRoot } from "@/lib/accessibility/manifest";
 import { pushEventLog } from "@/lib/observability/event-log";
+import { executeA11yTool } from "@/lib/webmcp/runtime";
 import {
   registerWebMCPToolsOnce,
   setAgentCallbacks,
 } from "@/lib/webmcp/tools";
 
-/**
- * Registers the WebMCP tool surface on every route so judges can inspect
- * tools from any page. Tools that need the fixture return a structured
- * "not mounted" error when the demo page is not open.
- */
 export default function WebMCPBootstrap() {
   useEffect(() => {
     setAgentCallbacks({
@@ -20,6 +16,16 @@ export default function WebMCPBootstrap() {
       getRoot: () => getFixtureRoot(),
     });
     registerWebMCPToolsOnce();
+
+    // Evaluation transport for the benchmark harness only.
+    if (
+      typeof window !== "undefined" &&
+      window.location.search.includes("eval=1")
+    ) {
+      (window as unknown as { __a11ymcp?: unknown }).__a11ymcp = {
+        executeA11yTool,
+      };
+    }
   }, []);
 
   return null;
