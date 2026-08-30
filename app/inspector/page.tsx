@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import ChainVerification from "@/components/webmcp/ChainVerification";
+import WhyWebMCP from "@/components/webmcp/WhyWebMCP";
 import { useEventLog } from "@/hooks/use-event-log";
 import { getFixtureRoot } from "@/lib/accessibility/manifest";
 import { pushEventLog } from "@/lib/observability/event-log";
@@ -140,6 +141,8 @@ export default function InspectorPage() {
       </section>
 
       <ChainVerification />
+
+      <WhyWebMCP />
 
       <section className="panel" aria-label="Local demo registry">
         <h2>Local demo registry ({localTools.length})</h2>

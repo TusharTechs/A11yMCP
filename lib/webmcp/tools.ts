@@ -120,7 +120,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "get_accessibility_capabilities",
     title: "Get accessibility capabilities",
     description:
-      "Returns the accessibility capabilities declared by this site's A11yMCP manifest, including support status, known unsupported needs, and commerce task tools.",
+      "Returns this site's declared accessibility capabilities (id, status supported|partial, limitations), the needs it cannot currently satisfy (notCurrentlyDeclared), and the commerce task tools. Call FIRST, before auditing, negotiating, or repairing, to learn what the site can adapt. Read-only; no approval required. If a user need appears in notCurrentlyDeclared, do not attempt to remediate it; report it as unsupported.",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
@@ -156,7 +156,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "get_accessibility_state",
     title: "Get accessibility state",
     description:
-      "Returns applied remediations, violation count, last negotiated profile, and commerce task state.",
+      "Returns live session state: applied remediations, total violation count, last negotiated profile, and commerce task state (cart items, checkout session, order). Call to re-inspect after any failure, before choosing a next action, or to confirm whether remediation is active. Read-only; no approval required.",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
@@ -190,7 +190,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "inspect_accessibility_tree",
     title: "Inspect accessibility tree",
     description:
-      "Returns a normalized accessibility tree for the fixture with current violations attached.",
+      "Returns the normalized accessibility tree of the storefront (roles, names, focusability) with current violations attached per node. Call when you need node-level detail rather than audit totals, e.g. to explain a specific barrier to the user. Read-only; no approval required. Use the audit tools for category totals.",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
@@ -210,7 +210,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "negotiate_accessibility_profile",
     title: "Negotiate accessibility profile",
     description:
-      "Matches the user's accessibility needs against the site's declared capabilities. Returns accepted, partial, and rejected capabilities with reasons.",
+      "Maps the user's accessibility needs against this site's declared capabilities. Returns accepted capabilities (supported, or partial with a stated limitation) and rejected needs with reasons. Call after get_accessibility_capabilities and BEFORE any repair tool. Mutates session state only (stores the profile); does not change the page. Never call a repair tool for a need this tool rejected.",
     inputSchema: negotiateInputJsonSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     schema: NegotiateInputSchema,
@@ -234,7 +234,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "audit_keyboard_navigation",
     title: "Audit keyboard navigation",
     description:
-      "Detects interactive elements that are not keyboard focusable and positive tabindex issues.",
+      "Detects interactive elements that are not keyboard focusable and positive-tabindex ordering issues, each tagged blocking|degrading|informational for the checkout task. Call after discovery and before negotiation to quantify keyboard barriers. Read-only; safe to repeat. pass=true with an empty violations array means this category cannot block the task.",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
@@ -253,7 +253,8 @@ export function registerWebMCPToolsOnce(): void {
   registerA11yTool({
     name: "audit_accessible_names",
     title: "Audit accessible names",
-    description: "Detects interactive controls that have no accessible name.",
+    description:
+      "Detects interactive controls that have no accessible name, tagged by task impact. Call after discovery and before negotiation. Read-only; safe to repeat. Pair with repair_accessible_names only if the site declares that capability.",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
@@ -273,7 +274,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "audit_form_associations",
     title: "Audit form associations",
     description:
-      "Detects form fields missing labels, placeholder-only labels, and unassociated error messages.",
+      "Detects form fields missing labels, placeholder-only labels, and error messages not associated with their field, tagged by task impact. Call before negotiation when the task involves forms. Read-only; safe to repeat.",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
@@ -293,7 +294,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "audit_focus_visibility",
     title: "Audit focus visibility",
     description:
-      "Probes each focusable control and detects missing visible focus indicators.",
+      "Probes each focusable control and detects missing visible focus indicators, tagged blocking for keyboard tasks. Supports AbortSignal cancellation. Call before negotiation for keyboard users. Read-only; safe to repeat.",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
@@ -313,7 +314,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "repair_accessible_names",
     title: "Repair accessible names",
     description:
-      "Applies the site-declared accessible name remediation (reversible). Requires user approval.",
+      "Applies the site-declared, reversible accessible-name remediation. Requires input.approval=true (explicit user consent); the schema rejects missing or false approval. Precondition: the site must declare the accessible_names capability (check get_accessibility_capabilities). Mutates the live page; reversible via rollback_all_remediations. Verify afterwards with verify_accessibility_profile.",
     inputSchema: approvalInputJsonSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     schema: ApprovalInputSchema,
@@ -338,7 +339,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "repair_keyboard_navigation",
     title: "Repair keyboard navigation",
     description:
-      "Applies the site-declared keyboard remediation for the size selector (reversible). Requires user approval.",
+      "Applies the site-declared, reversible keyboard remediation for the size selector (focusability plus Enter/Space/arrow handlers). Requires input.approval=true. Precondition: the site must declare keyboard_navigation. Mutates the live page; reversible via rollback_all_remediations. Verify afterwards with verify_accessibility_profile.",
     inputSchema: approvalInputJsonSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     schema: ApprovalInputSchema,
@@ -363,7 +364,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "repair_form_associations",
     title: "Repair form associations",
     description:
-      "Applies the site-declared label and error association remediation (reversible). Requires user approval.",
+      "Applies the site-declared, reversible label and error-association remediation for checkout fields. Requires input.approval=true. Precondition: the site must declare form_association and the checkout form may need to be mounted; if a related call fails with 'not mounted', call begin_checkout first where applicable. Mutates the live page; reversible via rollback_all_remediations.",
     inputSchema: approvalInputJsonSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     schema: ApprovalInputSchema,
@@ -388,7 +389,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "repair_focus_management",
     title: "Repair focus management",
     description:
-      "Applies the site-declared visible focus remediation (reversible). Requires user approval.",
+      "Applies the site-declared, reversible visible-focus remediation. Requires input.approval=true. Precondition: the site must declare focus_management. Mutates the live page; reversible via rollback_all_remediations. Verify afterwards with verify_accessibility_profile.",
     inputSchema: approvalInputJsonSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     schema: ApprovalInputSchema,
@@ -413,7 +414,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "repair_reduced_motion",
     title: "Repair reduced motion",
     description:
-      "Applies the site-declared motion reduction (reversible). Requires user approval. Only succeeds on sites that declare the reduced_motion capability.",
+      "Applies the site-declared, reversible motion reduction. Requires input.approval=true. Only succeeds on sites that declare the reduced_motion capability; on other sites it returns success:false with an evidence chain explaining the refusal. Mutates the live page; reversible via rollback_all_remediations.",
     inputSchema: approvalInputJsonSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     schema: ApprovalInputSchema,
@@ -438,7 +439,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "verify_accessibility_profile",
     title: "Verify accessibility profile",
     description:
-      "Runs all audits and reports whether the task-critical accessibility state passes.",
+      "Re-runs all task-critical audits and returns PASS|BLOCKED plus per-check results. Call after every remediation batch and before proceeding to commerce; also call it to confirm a rollback restored the original state. Read-only; no approval required. If a check fails, call the matching audit tool for violation details.",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
@@ -465,7 +466,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "rollback_all_remediations",
     title: "Rollback all remediations",
     description:
-      "Reverts every applied remediation and returns the fixture to its original state.",
+      "Reverts every applied remediation and restores the original experience. Call when the user withdraws consent or to reset between scenarios. Idempotent and safe when nothing is applied. No approval required (it removes changes, never adds them).",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     schema: EmptyInputSchema,
@@ -486,13 +487,11 @@ export function registerWebMCPToolsOnce(): void {
     },
   });
 
-  /* Phase 4 — commerce task tools */
-
   registerA11yTool({
     name: "search_products",
     title: "Search products",
     description:
-      "Searches the deterministic NOMA catalog and updates the visible product results.",
+      "Searches the deterministic NOMA catalog and updates the visible results. Call at the start of a purchase task; the returned product ids and sizes are the valid inputs for add_product_to_cart. Mutates UI state only; no approval required.",
     inputSchema: searchInputJsonSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     schema: SearchInputSchema,
@@ -516,7 +515,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "add_product_to_cart",
     title: "Add product to cart",
     description:
-      "Selects a product and size, then adds it to the cart. Reversible until checkout.",
+      "Selects a product and size, then adds it to the cart. Preconditions: productId from search_products and variantId within that product's sizes. Returns success:false with a message (and nextAction search_products) for unknown ids instead of throwing. Reversible until checkout; no approval required.",
     inputSchema: addToCartInputJsonSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     schema: AddToCartInputSchema,
@@ -528,10 +527,18 @@ export function registerWebMCPToolsOnce(): void {
       );
       const product = findProduct(input.productId);
       if (!product) {
-        return { success: false, message: `Unknown product: ${input.productId}` };
+        return {
+          success: false,
+          message: `Unknown product: ${input.productId}`,
+          nextAction: "search_products",
+        };
       }
       if (!product.sizes.includes(input.variantId)) {
-        return { success: false, message: `Unknown size: ${input.variantId}` };
+        return {
+          success: false,
+          message: `Unknown size: ${input.variantId}`,
+          nextAction: "search_products",
+        };
       }
       selectProduct(input.productId);
       selectSize(input.variantId);
@@ -547,7 +554,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "begin_checkout",
     title: "Begin checkout",
     description:
-      "Starts a checkout session for the current cart. Required before filling the checkout form.",
+      "Creates a checkout session for a non-empty cart and returns the sessionId required by fill_checkout_form and place_order. Precondition: at least one cart item; on an empty cart it fails with nextAction add_product_to_cart. Call before filling the form. No approval required.",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     schema: EmptyInputSchema,
@@ -561,7 +568,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "fill_checkout_form",
     title: "Fill checkout form",
     description:
-      "Fills and validates the checkout form for an active checkout session. Returns per-field errors when validation fails.",
+      "Fills and validates the active checkout form. Precondition: an active sessionId from begin_checkout; without one it fails with nextAction begin_checkout. On validation failure returns success:false with per-field errors; correct the values and retry. Mutates form state only; no approval required.",
     inputSchema: fillCheckoutInputJsonSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     schema: FillCheckoutInputSchema,
@@ -579,7 +586,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "place_order",
     title: "Place order",
     description:
-      "Places the order for a filled checkout session. Consequential: requires confirmation to be true.",
+      "Consequential action: places the order. Requires input.confirmation to be the literal true (explicit human confirmation) and a filled checkout session; the schema rejects confirmation:false. Returns the order id on success. A second call for the same session fails with 'Order already placed'. Always confirm with the user before calling.",
     inputSchema: placeOrderInputJsonSchema,
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     schema: PlaceOrderInputSchema,

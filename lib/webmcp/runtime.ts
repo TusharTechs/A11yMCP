@@ -2,7 +2,10 @@ import { z } from "zod";
 
 export type ToolResult =
   | { ok: true; data: unknown }
-  | { ok: false; error: { message: string; issues?: unknown[] } };
+  | {
+      ok: false;
+      error: { message: string; issues?: unknown[]; nextAction?: string };
+    };
 
 export interface ToolExecutionContext {
   signal?: AbortSignal;
@@ -48,8 +51,12 @@ function normalizeInput(input: unknown): unknown {
   return input === null || input === undefined ? {} : input;
 }
 
-function errorResult(message: string, issues?: unknown[]): ToolResult {
-  return { ok: false, error: { message, issues } };
+function errorResult(
+  message: string,
+  issues?: unknown[],
+  nextAction?: string
+): ToolResult {
+  return { ok: false, error: { message, issues, nextAction } };
 }
 
 export function registerA11yTool<TInput>(

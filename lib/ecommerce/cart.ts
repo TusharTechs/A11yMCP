@@ -138,9 +138,14 @@ export function beginCheckout(): {
   success: boolean;
   sessionId?: string;
   message: string;
+  nextAction?: string;
 } {
   if (snapshot.items.length === 0) {
-    return { success: false, message: "Cart is empty." };
+    return {
+      success: false,
+      message: "Cart is empty.",
+      nextAction: "add_product_to_cart",
+    };
   }
   if (snapshot.order) {
     return { success: false, message: "Order already placed. Start over first." };
@@ -173,9 +178,18 @@ export function updateCheckoutField(
 export function fillCheckoutForm(
   sessionId: string,
   values: CheckoutValues
-): { success: boolean; message: string; errors?: CheckoutFieldErrors } {
+): {
+  success: boolean;
+  message: string;
+  errors?: CheckoutFieldErrors;
+  nextAction?: string;
+} {
   if (!snapshot.checkoutSessionId) {
-    return { success: false, message: "Checkout session not started." };
+    return {
+      success: false,
+      message: "Checkout session not started.",
+      nextAction: "begin_checkout",
+    };
   }
   if (snapshot.checkoutSessionId !== sessionId) {
     return { success: false, message: "Unknown checkout session." };
@@ -210,9 +224,14 @@ export function placeOrder(sessionId: string): {
   success: boolean;
   order?: PlacedOrder;
   message: string;
+  nextAction?: string;
 } {
   if (!snapshot.checkoutSessionId || snapshot.checkoutSessionId !== sessionId) {
-    return { success: false, message: "Unknown checkout session." };
+    return {
+      success: false,
+      message: "Unknown checkout session.",
+      nextAction: "begin_checkout",
+    };
   }
 
   if (snapshot.order) {

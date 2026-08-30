@@ -74,4 +74,21 @@ describe("security negatives", () => {
     });
     expect(result.ok).toBe(false);
   });
+  
+  it("returns a recovery hint when checkout is not started", async () => {
+    const result = await executeA11yTool("fill_checkout_form", {
+      sessionId: "checkout-1",
+      values: {
+        email: "a@b.co",
+        fullName: "Alex",
+        address: "12 Lake Street",
+        city: "Bengaluru",
+        postalCode: "560001",
+      },
+    });
+    expect(result.ok).toBe(true);
+    const data = dataOf(result) as { success: boolean; nextAction?: string };
+    expect(data.success).toBe(false);
+    expect(data.nextAction).toBe("begin_checkout");
+  });
 });
