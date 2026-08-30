@@ -617,3 +617,33 @@ button:disabled {
     }
   }
 }
+
+/* P1.1 — site configs, motion, promo */
+
+.promo {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fixture[data-motion="full"] .promo {
+    animation: promo-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes promo-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.55;
+    }
+  }
+}
+
+.fixture[data-motion="reduced"] .promo {
+  animation: none;
+}

@@ -3,15 +3,23 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import AgentPanel from "@/components/agent/AgentPanel";
+import ChainVerification from "@/components/webmcp/ChainVerification";
 import LiveStorefront from "@/components/fixture/LiveStorefront";
 import OriginalStorefront from "@/components/fixture/OriginalStorefront";
-import ChainVerification from "@/components/webmcp/ChainVerification";
 import { useAgentState } from "@/hooks/use-agent-state";
 import { useCommerceState } from "@/hooks/use-commerce-state";
 import { useEventLog } from "@/hooks/use-event-log";
 import { useNegotiationState } from "@/hooks/use-negotiation-state";
 import { useRemediationState } from "@/hooks/use-remediation-state";
 import { getScenario } from "@/lib/agent/intent-parser";
+import { downloadEvidenceReport } from "@/lib/accessibility/evidence-report";
+import {
+  getCurrentManifest,
+  getSiteId,
+  setSite,
+  subscribeSite,
+} from "@/lib/accessibility/manifest";
+import { getRemediationHistory } from "@/lib/accessibility/remediation";
 import {
   executeA11yTool,
   type ToolResult,
@@ -21,6 +29,7 @@ import {
   type AccessibilityNeed,
   type AuditResult,
   type RemediationCategory,
+  type SiteId,
   type VerificationResult,
 } from "@/types/accessibility";
 
@@ -36,6 +45,7 @@ const CATEGORIES: RemediationCategory[] = [
   "keyboard_navigation",
   "form_association",
   "focus_management",
+  "reduced_motion",
 ];
 
 export default function DemoPage() {
@@ -45,10 +55,15 @@ export default function DemoPage() {
   const negotiation = useNegotiationState();
   const eventLog = useEventLog();
 
+  const [siteId, setSiteId] = useState<SiteId>(getSiteId());
   const [auditSummary, setAuditSummary] = useState<AuditResult[] | null>(null);
   const [verification, setVerification] = useState<VerificationResult | null>(
     null
   );
+
+  useEffect(() => {
+    return subscribeSite(() => setSiteId(getSiteId()));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,16 +78,43 @@ export default function DemoPage() {
     return () => {
       cancelled = true;
     };
-  }, [remediation, commerce]);
+  }, [remediation, commerce, siteId]);
 
   async function runVerify(): Promise<void> {
     const result = await executeA11yTool("verify_accessibility_profile", {});
     if (result.ok) setVerification(result.data as VerificationResult);
   }
 
-  function handlePreferencesSubmit(
-    event: FormEvent<HTMLFormElement>
-  ): void {
+  async function switchSite(id: SiteId): Promise<void> {
+    await executeA11yTool("rollback_all_remediations", {});
+    setSite(id);
+  }
+
+  async function exportEvidence(): Promise<void> {
+    const results: AuditResult[] = [];
+    for (const name of AUDIT_TOOLS) {
+      const result = await executeA11yTool(name, {});
+      if (result.ok) results.push(result.data as AuditResult);
+    }
+    const manifest = getCurrentManifest();
+    downloadEvidenceReport({
+      generatedAt: new Date().toISOString(),
+      protocol: "a11ymcp/0.5",
+      site: manifest.site,
+      disclaimer:
+        "Evidence report from a controlled runtime session. Not a legal accessibility certification.",
+      requestedNeeds: negotiation.lastNegotiation?.requestedNeeds ?? [],
+      negotiated: negotiation.lastNegotiation,
+      applied: remediation.applied,
+      remediationHistory: getRemediationHistory(),
+      currentAudits: results,
+      verification,
+      unsupportedRequests: negotiation.lastNegotiation?.rejected ?? [],
+      notDeclaredBySite: manifest.notDeclared,
+    });
+  }
+
+  function handlePreferencesSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const needs = data
@@ -86,6 +128,10 @@ export default function DemoPage() {
   }
 
   const allPass = auditSummary?.every((audit) => audit.pass) ?? false;
+  const blockingCount =
+    auditSummary
+      ?.flatMap((audit) => audit.violations)
+      .filter((violation) => violation.taskImpact === "blocking").length ?? 0;
   const lastNegotiation = negotiation.lastNegotiation;
   const utterance = agent.scenarioId
     ? getScenario(agent.scenarioId).utterance
@@ -98,15 +144,32 @@ export default function DemoPage() {
           <p className="group-label">User need</p>
           <p className="need-text">{utterance}</p>
         </div>
+
         <div className="chips">
+          <span className="chip">site: {siteId}</span>
           <span className="chip">phase: {agent.phase}</span>
           <span className="chip">task: {commerce.taskState}</span>
           <span className={`chip ${allPass ? "chip-pass" : "chip-fail"}`}>
             task accessibility: {allPass ? "PASS" : "BLOCKED"}
           </span>
+          <span className={`chip ${blockingCount === 0 ? "chip-pass" : "chip-fail"}`}>
+            task-blocking: {blockingCount}
+          </span>
           {agent.lastOrderId ? (
             <span className="chip chip-pass">order {agent.lastOrderId}</span>
           ) : null}
+        </div>
+
+        <div className="button-row">
+          <button type="button" onClick={() => void switchSite("site-a")}>
+            Site A (names/forms)
+          </button>
+          <button type="button" onClick={() => void switchSite("site-b")}>
+            Site B (reduced motion)
+          </button>
+          <button type="button" onClick={() => void exportEvidence()}>
+            Export evidence report
+          </button>
         </div>
 
         <form
@@ -211,12 +274,12 @@ export default function DemoPage() {
           ) : null}
         </section>
       </div>
-      
+
       <ChainVerification />
 
       {auditSummary ? (
         <section className="panel">
-          <h2>Audit summary</h2>
+          <h2>Audit summary (task-scoped)</h2>
           <div className="chips">
             {auditSummary.map((audit) => (
               <span
@@ -241,7 +304,9 @@ export default function DemoPage() {
               )}
             </pre>
           ) : (
-            <p className="muted">No violations. The fixture is task-accessible.</p>
+            <p className="muted">
+              No violations. The fixture is task-accessible.
+            </p>
           )}
         </section>
       ) : null}

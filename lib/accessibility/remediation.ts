@@ -1,5 +1,6 @@
 import type {
   AuditResult,
+  EvidenceStep,
   RemediationCategory,
   RemediationResult,
   RemediationSnapshot,
@@ -9,17 +10,32 @@ import {
   auditFocusVisibility,
   auditFormAssociations,
   auditKeyboardNavigation,
+  auditReducedMotion,
 } from "./audits";
-import { SITE_MANIFEST } from "./manifest";
+import { getCurrentManifest } from "./manifest";
+import { buildVerification } from "./verification";
 
-let snapshot: RemediationSnapshot = {
+interface ExtendedSnapshot extends RemediationSnapshot {
+  history: RemediationResult[];
+}
+
+let snapshot: ExtendedSnapshot = {
   applied: {
     accessible_names: false,
     keyboard_navigation: false,
     form_association: false,
     focus_management: false,
+    reduced_motion: false,
   },
+  history: [],
 };
+
+/**
+ * Cached public snapshot. useSyncExternalStore compares snapshots with
+ * Object.is, so getRemediationSnapshot() must return the SAME object
+ * between state changes. Never return a fresh object per call.
+ */
+let publicSnapshot: RemediationSnapshot = { applied: snapshot.applied };
 
 const listeners = new Set<() => void>();
 let remediationCounter = 0;
@@ -32,7 +48,11 @@ export function subscribeRemediation(listener: () => void): () => void {
 }
 
 export function getRemediationSnapshot(): RemediationSnapshot {
-  return snapshot;
+  return publicSnapshot;
+}
+
+export function getRemediationHistory(): RemediationResult[] {
+  return snapshot.history;
 }
 
 export function isApplied(category: RemediationCategory): boolean {
@@ -40,7 +60,16 @@ export function isApplied(category: RemediationCategory): boolean {
 }
 
 function setApplied(category: RemediationCategory, value: boolean): void {
-  snapshot = { applied: { ...snapshot.applied, [category]: value } };
+  snapshot = {
+    ...snapshot,
+    applied: { ...snapshot.applied, [category]: value },
+  };
+  publicSnapshot = { applied: snapshot.applied };
+  listeners.forEach((listener) => listener());
+}
+
+function pushHistory(result: RemediationResult): void {
+  snapshot = { ...snapshot, history: [...snapshot.history, result].slice(-50) };
   listeners.forEach((listener) => listener());
 }
 
@@ -66,6 +95,8 @@ export function auditForCategory(
       return auditFormAssociations(root);
     case "focus_management":
       return auditFocusVisibility(root);
+    case "reduced_motion":
+      return auditReducedMotion(root);
   }
 }
 
@@ -82,7 +113,27 @@ export async function applyRemediation(
   category: RemediationCategory,
   root: Element
 ): Promise<RemediationResult> {
+  const manifest = getCurrentManifest();
+  const capability = manifest.capabilities.find((c) => c.id === category);
   const before = auditForCategory(category, root).violations.length;
+
+  if (!capability) {
+    return {
+      success: false,
+      remediationId: `rem-${category}-unsupported`,
+      category,
+      changes: [],
+      beforeViolations: before,
+      afterViolations: before,
+      reversible: false,
+      evidenceChain: [
+        {
+          stage: "why",
+          detail: `Site "${manifest.site}" does not declare capability "${category}". Remediation refused.`,
+        },
+      ],
+    };
+  }
 
   if (snapshot.applied[category]) {
     return {
@@ -90,10 +141,15 @@ export async function applyRemediation(
       remediationId: `rem-${category}-existing`,
       category,
       alreadyApplied: true,
-      changes: SITE_MANIFEST.directives[category],
+      changes: manifest.directives[category],
       beforeViolations: before,
       afterViolations: before,
       reversible: true,
+      evidenceChain: [
+        { stage: "before", detail: `${before} violation(s).` },
+        { stage: "action", detail: "Already applied; no-op." },
+        { stage: "after", detail: `${before} violation(s).` },
+      ],
     };
   }
 
@@ -102,16 +158,38 @@ export async function applyRemediation(
 
   remediationCounter += 1;
   const after = auditForCategory(category, root).violations.length;
+  const verification = buildVerification(root);
 
-  return {
+  const result: RemediationResult = {
     success: true,
     remediationId: `rem-${category}-${remediationCounter}`,
     category,
-    changes: SITE_MANIFEST.directives[category],
+    changes: manifest.directives[category],
     beforeViolations: before,
     afterViolations: after,
     reversible: true,
+    evidenceChain: [
+      { stage: "before", detail: `${before} violation(s) in ${category} audit.` },
+      {
+        stage: "why",
+        detail: capability.limitation
+          ? `Capability "${category}" accepted (${capability.status}): ${capability.limitation}`
+          : `Capability "${category}" accepted for the negotiated profile.`,
+      },
+      {
+        stage: "action",
+        detail: `${capability.repairTool} applied ${manifest.directives[category].length} site-declared directive(s).`,
+      },
+      { stage: "after", detail: `${after} violation(s) in ${category} audit.` },
+      {
+        stage: "verification",
+        detail: `Task accessibility: ${verification.taskAccessibility}.`,
+      },
+    ],
   };
+
+  pushHistory(result);
+  return result;
 }
 
 export async function rollbackAll(

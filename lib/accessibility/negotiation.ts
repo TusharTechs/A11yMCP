@@ -4,7 +4,7 @@ import type {
   NegotiatedProfile,
   RejectedNeed,
 } from "@/types/accessibility";
-import { SITE_MANIFEST } from "./manifest";
+import { getCurrentManifest } from "./manifest";
 import { NEED_TO_CAPABILITY } from "./profiles";
 
 interface NegotiationSnapshot {
@@ -35,7 +35,7 @@ export function negotiateProfile(
   for (const need of needs) {
     const capabilityId = NEED_TO_CAPABILITY[need];
     const capability = capabilityId
-      ? SITE_MANIFEST.capabilities.find((c) => c.id === capabilityId)
+      ? getCurrentManifest().capabilities.find((c) => c.id === capabilityId)
       : undefined;
 
     if (!capabilityId || !capability) {

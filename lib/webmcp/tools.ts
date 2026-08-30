@@ -4,7 +4,7 @@ import {
   auditFormAssociations,
   auditKeyboardNavigation,
 } from "@/lib/accessibility/audits";
-import { SITE_MANIFEST } from "@/lib/accessibility/manifest";
+import { getCurrentManifest } from "@/lib/accessibility/manifest";
 import {
   getNegotiationSnapshot,
   negotiateProfile,
@@ -130,12 +130,13 @@ export function registerWebMCPToolsOnce(): void {
         "get_accessibility_capabilities",
         "Capability discovery requested."
       );
+      const manifest = getCurrentManifest();
       return {
-        protocol: "a11ymcp/0.4",
-        site: SITE_MANIFEST.site,
+        protocol: "a11ymcp/0.5",
+        site: manifest.site,
         generatedAt: new Date().toISOString(),
-        capabilities: SITE_MANIFEST.capabilities,
-        notCurrentlyDeclared: ["high_contrast", "reduced_motion", "large_targets"],
+        capabilities: manifest.capabilities,
+        notCurrentlyDeclared: manifest.notDeclared,
         taskTools: [
           "search_products",
           "add_product_to_cart",
@@ -402,6 +403,31 @@ export function registerWebMCPToolsOnce(): void {
       logEvent(
         "REMEDIATION_APPLIED",
         "repair_focus_management",
+        `Violations ${result.beforeViolations} -> ${result.afterViolations}.`
+      );
+      return result;
+    },
+  });
+
+  registerA11yTool({
+    name: "repair_reduced_motion",
+    title: "Repair reduced motion",
+    description:
+      "Applies the site-declared motion reduction (reversible). Requires user approval. Only succeeds on sites that declare the reduced_motion capability.",
+    inputSchema: approvalInputJsonSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    schema: ApprovalInputSchema,
+    run: async () => {
+      const root = requireRoot();
+      logEvent(
+        "TOOL_INVOKED",
+        "repair_reduced_motion",
+        "Requested motion reduction."
+      );
+      const result = await applyRemediation("reduced_motion", root);
+      logEvent(
+        "REMEDIATION_APPLIED",
+        "repair_reduced_motion",
         `Violations ${result.beforeViolations} -> ${result.afterViolations}.`
       );
       return result;

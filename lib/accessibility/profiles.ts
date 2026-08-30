@@ -4,11 +4,6 @@ import type {
   UserProfile,
 } from "@/types/accessibility";
 
-/**
- * Deterministic mapping from human accessibility needs to site capabilities.
- * A null value means no current site capability can satisfy this need;
- * the negotiation must reject it honestly instead of faking support.
- */
 export const NEED_TO_CAPABILITY: Record<
   AccessibilityNeed,
   RemediationCategory | null
@@ -18,7 +13,7 @@ export const NEED_TO_CAPABILITY: Record<
   screen_reader_labels: "accessible_names",
   form_support: "form_association",
   high_contrast: null,
-  reduced_motion: null,
+  reduced_motion: "reduced_motion",
   large_targets: null,
 };
 
@@ -27,6 +22,7 @@ export const APPLY_ORDER: RemediationCategory[] = [
   "focus_management",
   "accessible_names",
   "form_association",
+  "reduced_motion",
 ];
 
 export const PROFILE_PRESETS: UserProfile[] = [

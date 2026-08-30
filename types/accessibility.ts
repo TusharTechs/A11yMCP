@@ -1,9 +1,14 @@
 export type Severity = "high" | "medium" | "low";
 
+export type TaskImpact = "blocking" | "degrading" | "informational";
+
+export type SiteId = "site-a" | "site-b";
+
 export interface AccessibilityViolation {
   id: string;
   rule: string;
   severity: Severity;
+  taskImpact: TaskImpact;
   selector: string;
   message: string;
 }
@@ -29,11 +34,17 @@ export type RemediationCategory =
   | "accessible_names"
   | "keyboard_navigation"
   | "form_association"
-  | "focus_management";
+  | "focus_management"
+  | "reduced_motion";
 
 export interface ChangeRecord {
   selector: string;
   change: string;
+}
+
+export interface EvidenceStep {
+  stage: "before" | "why" | "action" | "after" | "verification";
+  detail: string;
 }
 
 export interface RemediationResult {
@@ -45,6 +56,7 @@ export interface RemediationResult {
   beforeViolations: number;
   afterViolations: number;
   reversible: boolean;
+  evidenceChain: EvidenceStep[];
 }
 
 export interface RemediationSnapshot {
@@ -66,8 +78,6 @@ export interface VerificationResult {
   checks: VerificationCheck[];
   violations: AccessibilityViolation[];
 }
-
-/* Phase 3 — negotiation */
 
 export const ALL_NEEDS = [
   "keyboard_only",

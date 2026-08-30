@@ -31,6 +31,7 @@ const NO_REMEDIATION: Record<RemediationCategory, boolean> = {
   keyboard_navigation: false,
   form_association: false,
   focus_management: false,
+  reduced_motion: false,
 };
 
 /**

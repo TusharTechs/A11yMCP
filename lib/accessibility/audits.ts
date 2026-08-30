@@ -1,4 +1,9 @@
-import type { AccessibilityViolation, AuditResult } from "@/types/accessibility";
+import type {
+  AccessibilityViolation,
+  AuditResult,
+  Severity,
+  TaskImpact,
+} from "@/types/accessibility";
 import {
   computeName,
   computeRole,
@@ -6,6 +11,51 @@ import {
   isFocusable,
   isVisible,
 } from "./tree";
+
+const SEVERITY_BY_RULE: Record<string, Severity> = {
+  "interactive-not-focusable": "high",
+  "focus-not-visible": "high",
+  "input-missing-label": "high",
+  "error-not-associated": "medium",
+  "placeholder-as-label": "medium",
+  "missing-accessible-name": "medium",
+  "positive-tabindex": "medium",
+  "motion-not-reduced": "low",
+  aborted: "low",
+};
+
+/**
+ * Task-scoped prioritization for the keyboard-checkout task.
+ * Classifications are defensible: focusability and form association block
+ * the task; naming and tab-order issues degrade it; motion is informational
+ * for this task.
+ */
+const IMPACT_BY_RULE: Record<string, TaskImpact> = {
+  "interactive-not-focusable": "blocking",
+  "focus-not-visible": "blocking",
+  "input-missing-label": "blocking",
+  "error-not-associated": "blocking",
+  "placeholder-as-label": "degrading",
+  "missing-accessible-name": "degrading",
+  "positive-tabindex": "degrading",
+  "motion-not-reduced": "informational",
+  aborted: "informational",
+};
+
+function violation(
+  rule: string,
+  selector: string,
+  message: string
+): AccessibilityViolation {
+  return {
+    id: `${rule}:${selector}`,
+    rule,
+    severity: SEVERITY_BY_RULE[rule] ?? "medium",
+    taskImpact: IMPACT_BY_RULE[rule] ?? "informational",
+    selector,
+    message,
+  };
+}
 
 const INTERACTIVE_ROLES = new Set([
   "button",
@@ -47,24 +97,24 @@ export function auditKeyboardNavigation(root: Element): AuditResult {
     const role = computeRole(el);
 
     if (!isFocusable(el)) {
-      violations.push({
-        id: `interactive-not-focusable:${selector}`,
-        rule: "interactive-not-focusable",
-        severity: "high",
-        selector,
-        message: `Element with role "${role}" is not keyboard focusable.`,
-      });
+      violations.push(
+        violation(
+          "interactive-not-focusable",
+          selector,
+          `Element with role "${role}" is not keyboard focusable.`
+        )
+      );
     }
 
     const tabindex = el.getAttribute("tabindex");
     if (tabindex !== null && Number.parseInt(tabindex, 10) > 0) {
-      violations.push({
-        id: `positive-tabindex:${selector}`,
-        rule: "positive-tabindex",
-        severity: "medium",
-        selector,
-        message: "Positive tabindex creates a confusing tab order.",
-      });
+      violations.push(
+        violation(
+          "positive-tabindex",
+          selector,
+          "Positive tabindex creates a confusing tab order."
+        )
+      );
     }
   }
 
@@ -84,14 +134,13 @@ export function auditAccessibleNames(root: Element): AuditResult {
     const info = computeName(el);
 
     if (!info.name) {
-      const selector = getSelector(el);
-      violations.push({
-        id: `missing-accessible-name:${selector}`,
-        rule: "missing-accessible-name",
-        severity: "high",
-        selector,
-        message: `Control with role "${computeRole(el)}" has no accessible name.`,
-      });
+      violations.push(
+        violation(
+          "missing-accessible-name",
+          getSelector(el),
+          `Control with role "${computeRole(el)}" has no accessible name.`
+        )
+      );
     }
   }
 
@@ -125,22 +174,22 @@ export function auditFormAssociations(root: Element): AuditResult {
     const placeholder = el.getAttribute("placeholder");
 
     if (!hasLabel) {
-      violations.push({
-        id: `input-missing-label:${selector}`,
-        rule: "input-missing-label",
-        severity: "high",
-        selector,
-        message: "Form field has no associated label.",
-      });
+      violations.push(
+        violation(
+          "input-missing-label",
+          selector,
+          "Form field has no associated label."
+        )
+      );
 
       if (placeholder) {
-        violations.push({
-          id: `placeholder-as-label:${selector}`,
-          rule: "placeholder-as-label",
-          severity: "medium",
-          selector,
-          message: "Placeholder is being used as the only visible label.",
-        });
+        violations.push(
+          violation(
+            "placeholder-as-label",
+            selector,
+            "Placeholder is being used as the only visible label."
+          )
+        );
       }
     }
 
@@ -148,17 +197,14 @@ export function auditFormAssociations(root: Element): AuditResult {
       const errorEl = root.querySelector(`#${el.id}-error`);
       const describedby = el.getAttribute("aria-describedby") ?? "";
 
-      if (
-        errorEl &&
-        !describedby.split(/\s+/).includes(`${el.id}-error`)
-      ) {
-        violations.push({
-          id: `error-not-associated:${selector}`,
-          rule: "error-not-associated",
-          severity: "medium",
-          selector,
-          message: "Error message exists but is not associated with the field.",
-        });
+      if (errorEl && !describedby.split(/\s+/).includes(`${el.id}-error`)) {
+        violations.push(
+          violation(
+            "error-not-associated",
+            selector,
+            "Error message exists but is not associated with the field."
+          )
+        );
       }
     }
   }
@@ -181,13 +227,13 @@ export function auditFocusVisibility(
 
   for (const el of focusables) {
     if (signal?.aborted) {
-      violations.push({
-        id: `aborted:${getSelector(el)}`,
-        rule: "aborted",
-        severity: "low",
-        selector: getSelector(el),
-        message: "Audit aborted by AbortSignal.",
-      });
+      violations.push(
+        violation(
+          "aborted",
+          getSelector(el),
+          "Audit aborted by AbortSignal."
+        )
+      );
       return {
         id: "focus_visibility",
         title: "Focus visibility",
@@ -203,14 +249,13 @@ export function auditFocusVisibility(
     const shadowVisible = style.boxShadow !== "none";
 
     if (!outlineVisible && !shadowVisible) {
-      const selector = getSelector(el);
-      violations.push({
-        id: `focus-not-visible:${selector}`,
-        rule: "focus-not-visible",
-        severity: "high",
-        selector,
-        message: "Focus indicator is not visible on this control.",
-      });
+      violations.push(
+        violation(
+          "focus-not-visible",
+          getSelector(el),
+          "Focus indicator is not visible on this control."
+        )
+      );
     }
   }
 
@@ -223,5 +268,23 @@ export function auditFocusVisibility(
     title: "Focus visibility",
     pass: violations.length === 0,
     violations,
+  };
+}
+
+export function auditReducedMotion(root: Element): AuditResult {
+  const reduced = root.getAttribute("data-motion") === "reduced";
+  return {
+    id: "reduced_motion",
+    title: "Reduced motion",
+    pass: reduced,
+    violations: reduced
+      ? []
+      : [
+          violation(
+            "motion-not-reduced",
+            getSelector(root),
+            "Motion reduction is not applied."
+          ),
+        ],
   };
 }
