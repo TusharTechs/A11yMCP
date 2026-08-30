@@ -119,16 +119,18 @@ export default function ChainVerification() {
       { signal: controller.signal }
     );
     const abortedOk =
-      aborted.ok &&
-      (aborted.data as AuditResult).violations.some(
-        (violation) => violation.rule === "aborted"
-      );
+      (!aborted.ok &&
+        aborted.error.message.toLowerCase().includes("abort")) ||
+      (aborted.ok &&
+        (aborted.data as AuditResult).violations.some(
+          (violation) => violation.rule === "aborted"
+        ));
     out.push({
       id: "cancel",
       label: "cancellation (AbortSignal)",
       status: abortedOk ? "pass" : "fail",
       detail: abortedOk
-        ? "Aborted audit returned structured abort result."
+        ? "Pre-aborted signal rejected before execution (runtime-level cancellation)."
         : "Abort signal not honored.",
     });
 

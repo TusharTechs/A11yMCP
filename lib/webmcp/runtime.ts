@@ -95,6 +95,10 @@ export async function executeA11yTool(
   rawInput: unknown,
   options?: ToolExecutionContext
 ): Promise<ToolResult> {
+  if (options?.signal?.aborted) {
+    return errorResult("aborted");
+  }
+
   const tool = toolRegistry.get(name);
 
   if (!tool) {
