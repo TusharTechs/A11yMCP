@@ -131,9 +131,11 @@ native implementation, not only through the polyfill.
 
 What is still **not** claimed: `docs/evidence/webmcp-transport-trace.json` is
 a Playwright capture and correctly reports the polyfill, because Chromium has
-no WebMCP flag; it is not evidence about native. And the declarative-form fix
-that run produced (`d7d97dd`) has not itself been re-verified against a
-native browser yet.
+no WebMCP flag; it is not evidence about native. The declarative-form fix that run produced
+(`d7d97dd`) *was* re-verified by the same agent over the same native
+transport: it now reports 21 tools with
+`submit_accessibility_preferences` among them, where it previously reported
+20 and resorted to clicking the form by hand.
 
 The ChatGPT run also reported that it sent `approval: true` without
 separately asking the human first. That is a genuine limitation of the trust

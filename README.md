@@ -276,6 +276,10 @@ bug: verification returned PASS for a profile where the site had accepted
 *nothing*, because an empty scope has nothing left in it to fail. Fixed, with
 a test that reproduces the agent's exact path.
 
+Both fixes were then **re-verified by the same agent over the same native
+transport** — it now reports 21 tools rather than 20, with the declarative
+form among them, so it no longer has to click that form by hand.
+
 The full run is pasted unedited — criticism included — in
 [`docs/evidence/external-agent-transcript.md`](docs/evidence/external-agent-transcript.md).
 

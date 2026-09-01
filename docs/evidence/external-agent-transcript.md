@@ -232,6 +232,35 @@ tools with exactly the declarative one missing is what a native
 implementation that does not synthesize `<form toolname>` looks like from the
 outside.
 
+## Run 1b — the same agent, after the fix
+
+**Date:** 2026-09-02, same session
+**Transport:** native `document.modelContext`
+
+`d7d97dd` was deployed and the agent was asked to reload and list what it
+could see. It reported **21** tools:
+
+```
+get_accessibility_capabilities      audit_focus_visibility        search_products
+get_accessibility_state             repair_accessible_names       add_product_to_cart
+inspect_accessibility_tree          repair_keyboard_navigation    begin_checkout
+negotiate_accessibility_profile     repair_form_associations      fill_checkout_form
+audit_keyboard_navigation           repair_focus_management       place_order
+audit_accessible_names              repair_reduced_motion         submit_accessibility_preferences
+audit_form_associations             verify_accessibility_profile
+                                    rollback_all_remediations
+```
+
+`submit_accessibility_preferences` is present. The declarative form the agent
+previously had to keyboard-click by hand is now a tool it can call, over a
+native implementation that does not synthesize `<form toolname>` itself.
+
+Found by an agent, fixed, and verified by the same agent, in one session.
+That loop is the most useful thing in this file — more than the clean run
+would have been.
+
+---
+
 ## Run 2 — optional second scenario
 
 **Prompt:**
