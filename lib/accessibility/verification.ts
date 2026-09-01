@@ -81,9 +81,14 @@ export function buildVerification(
     };
   });
 
-  const blockedInScope = checks.some(
-    (check) => check.inScope && !check.pass
-  );
+  // A negotiation that accepted nothing means the site cannot satisfy any of
+  // this person's needs. Reporting PASS there — because an empty scope has
+  // nothing in it left to fail — tells them the opposite of the truth. It is
+  // BLOCKED: there is no profile under which this task is accessible.
+  const nothingAccepted = Boolean(profile) && profile!.accepted.length === 0;
+
+  const blockedInScope =
+    nothingAccepted || checks.some((check) => check.inScope && !check.pass);
 
   const advisories = results
     .filter((result) => !isInScope(result.id))

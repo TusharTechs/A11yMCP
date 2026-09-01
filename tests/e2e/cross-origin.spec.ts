@@ -58,6 +58,14 @@ test("the widget refuses an embedder it was not configured to trust", async ({
   await section
     .getByRole("checkbox", { name: "the widget trusts this origin" })
     .uncheck();
+  // Unticking re-creates the iframe with a different ?embedder. Wait for the
+  // new document to actually be listening before asking it anything — under
+  // parallel load the click can otherwise land on the outgoing frame.
+  await expect(section.locator("iframe.tool-frame")).toHaveAttribute(
+    "src",
+    /embedder=https%3A%2F%2Fnot-this-site\.example/
+  );
+  await page.waitForTimeout(600);
   await section.getByRole("button", { name: "Ask the widget for its tools" }).click();
 
   await expect(
