@@ -9,7 +9,7 @@
 
 *The WebMCP Challenge*
 
-[**Judge mode — start here**](https://a11ymcp.vercel.app/demo?judge=1) · [Live demo](https://a11ymcp.vercel.app/demo) · [Inspector](https://a11ymcp.vercel.app/inspector) · [Drop-in adapter demo](https://a11ymcp.vercel.app/partner) · [Architecture](#architecture) · [Run it locally](#run-it-locally)
+[**▶ Watch the 3-minute demo**](https://youtu.be/p1m6QgeKI6c) · [**Judge mode — start here**](https://a11ymcp.vercel.app/demo?judge=1) · [Live demo](https://a11ymcp.vercel.app/demo) · [Inspector](https://a11ymcp.vercel.app/inspector) · [Drop-in adapter demo](https://a11ymcp.vercel.app/partner) · [Architecture](#architecture) · [Run it locally](#run-it-locally)
 
 ![A11yMCP architecture](docs/architecture.svg)
 
@@ -47,7 +47,7 @@ tools are on `document.modelContext` and your agent can call them directly.
 | **Creative & novel concept** | Not another form-filler. **Capability *negotiation*** — the site returns `accepted` / `partial (with limitation)` / `rejected (with reason)`, and the agent never fakes a capability the site didn't declare. The [live side-by-side proof](components/judge/ProofRace.tsx) runs an actuation agent and a WebMCP agent against the same page and shows where the first one has to start guessing. | [`negotiation.ts:29`](lib/accessibility/negotiation.ts#L29) · [`actuation-baseline.ts`](lib/agent/actuation-baseline.ts) |
 | Live deployed URL (works in a WebMCP browser) | https://a11ymcp.vercel.app — polyfill in any browser, native `document.modelContext` used automatically where present | [`deployment.md`](docs/evidence/deployment.md) |
 | Public repo + OSS license | This repo, **MIT** | [`LICENSE`](LICENSE) |
-| Demo video < 3 min, with audio | Shot-by-shot script ready; recording is the one open item | *(script kept locally)* |
+| Demo video < 3 min, with audio | 2:59, narrated — the blocked task, the honest rejection, the approval gate, the adapted page, and the live side-by-side proof | [**▶ YouTube**](https://youtu.be/p1m6QgeKI6c) |
 
 **Verify it yourself in one command** (no keys, no account):
 
@@ -167,6 +167,8 @@ declares, and every mutation is reversible. This is the adoption story: a
 manifest file plus a script tag.
 
 ## Architecture
+
+**[Open the architecture diagram →](docs/architecture.svg)**
 
 Next.js App Router. One WebMCP runtime, one deterministic accessibility
 engine, one adapter model, exercised two ways — a rich app (`/demo`) and a
@@ -427,11 +429,25 @@ Next.js 16 (App Router) · React 19 · TypeScript · Zod · `document.modelConte
 
 ## Demo video
 
-`docs/VIDEO_SCRIPT.md` (kept out of the repo) is a 2:50 shot list shot
-entirely from `/demo?judge=1`: the Tab key visibly failing, discovery through
-`document.modelContext`, the honest rejection, the run pausing at the approval
-gate, the Tab key visibly working, profile-scoped verification, the completed
-purchase, and the live side-by-side proof.
+**[▶ Watch it on YouTube](https://youtu.be/p1m6QgeKI6c)** — 2:59, narrated, shot entirely from
+[`/demo?judge=1`](https://a11ymcp.vercel.app/demo?judge=1).
+
+| | |
+|---|---|
+| 0:00 | A keyboard-only shopper hits a wall — focus skips the size selector entirely |
+| 0:18 | The agent asks the website what it can adapt, over `document.modelContext` |
+| 0:34 | **The honest no** — a need this site does not declare is rejected, not faked |
+| 0:50 | The run stops and asks permission before touching the page |
+| 1:02 | Tab, again — the barrier is gone, and the site drew the focus ring itself |
+| 1:22 | The site verifies its own work, scoped to what was negotiated |
+| 1:34 | The purchase completes, behind a second confirmation gate |
+| 1:46 | The same task attempted two ways, live, on the same page |
+| 2:22 | A static page and a cross-origin widget doing the same thing |
+
+Every interaction in the film is driven by
+[`docs/direct-demo.mjs`](docs/direct-demo.mjs), so the whole run is
+reproducible — including the focus annotation that makes the invisible
+barrier visible.
 
 ## License
 

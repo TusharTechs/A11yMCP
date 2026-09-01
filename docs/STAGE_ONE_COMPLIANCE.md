@@ -85,8 +85,9 @@ Status key: [x] done · [~] partial · [ ] pending
 - [x] Open-source license present (MIT in repo root)
 - [x] All required source/assets/instructions present (README, LICENSE, docs/)
 - [x] Testing instructions provided (docs/VERIFICATION_RUNBOOKS.md)
-- [ ] Demo video < 3 minutes, YouTube, with audio, explicitly demonstrating
-      WebMCP. **Not yet recorded.** Script: `docs/VIDEO_SCRIPT.md`.
+- [x] Demo video < 3 minutes, YouTube, with audio, explicitly demonstrating
+      WebMCP: https://youtu.be/p1m6QgeKI6c — 2:59, narrated. Every interaction is
+      driven by `docs/direct-demo.mjs`, so the run is reproducible.
 - [~] Third-party recorded agent transcript (ChatGPT in-app browser / Chrome
       with a native WebMCP agent). **Optional supplementary evidence, not yet
       captured** — see `docs/evidence/external-agent-transcript.md`. The
@@ -110,5 +111,5 @@ Status key: [x] done · [~] partial · [ ] pending
 Stage One functional requirements are met: real `document.modelContext`
 registration and execution, a non-trivial workflow, a public repo and
 deployed URL, and passing automated suites. Two submission items are still
-outstanding and are tracked openly above: the demo video, and an optional
-third-party agent transcript. Neither is faked or pre-claimed.
+outstanding and tracked openly above: an optional third-party agent
+transcript. It is not faked or pre-claimed.
