@@ -14,6 +14,8 @@
  * inspector shows which transport is live via {@link isNativeWebMCP}.
  */
 
+import { coerceToolInput, toMcpToolResponse } from "./mcp";
+
 const POLYFILL_FLAG = "__a11ymcpPolyfill";
 
 interface RegisteredTool {
@@ -60,15 +62,30 @@ export function ensureModelContext(): ModelContext | null {
   });
 
   const modelContext: ModelContext = {
-    registerTool(tool: WebMCPToolDefinition) {
+    registerTool(
+      tool: WebMCPToolDefinition,
+      options?: WebMCPRegisterToolOptions
+    ) {
       const stored = tool as unknown as RegisteredTool;
       tools.set(stored.name, stored);
       emitChange();
-      return {
-        unregister: () => {
-          if (tools.delete(stored.name)) emitChange();
-        },
+
+      const unregister = (): void => {
+        if (tools.get(stored.name) === stored && tools.delete(stored.name)) {
+          emitChange();
+        }
       };
+
+      // Spec lifecycle: registration is torn down by aborting the signal
+      // handed to registerTool. The returned handle is a convenience the
+      // polyfill keeps for callers that predate the signal option.
+      const signal = options?.signal;
+      if (signal) {
+        if (signal.aborted) unregister();
+        else signal.addEventListener("abort", unregister, { once: true });
+      }
+
+      return { unregister };
     },
     unregisterTool(toolOrName: unknown) {
       const name =
@@ -81,15 +98,31 @@ export function ensureModelContext(): ModelContext | null {
       return Array.from(tools.values()).map(describe);
     },
     async executeTool(
-      name: string,
-      input: unknown,
+      target: unknown,
+      input?: unknown,
       context?: WebMCPToolExecuteContext
     ) {
+      // Native WebMCP is called as executeTool(toolDescriptor, jsonString);
+      // the app and older callers use executeTool(name, object). Accept both
+      // so the same dispatch path works against either implementation.
+      const name =
+        typeof target === "string"
+          ? target
+          : String((target as { name?: unknown } | null)?.name ?? "");
+
       const tool = tools.get(name);
       if (!tool) {
-        return { ok: false, error: { message: `Tool not found: ${name}` } };
+        const failure = {
+          ok: false as const,
+          error: { message: `Tool not found: ${name}` },
+        };
+        return {
+          content: [{ type: "text" as const, text: failure.error.message }],
+          structuredContent: failure,
+          isError: true,
+        };
       }
-      return tool.execute(input ?? {}, context);
+      return tool.execute(coerceToolInput(input), context);
     },
     addEventListener(type, listener) {
       if (type === "toolchange") listeners.add(listener);
@@ -162,7 +195,8 @@ function syncDeclarativeForms(mc: ModelContext): void {
           additionalProperties: false,
         },
         annotations: { readOnlyHint: false, declarative: true },
-        execute: (input: unknown) => {
+        execute: (rawInput: unknown) => {
+          const input = coerceToolInput(rawInput);
           const values = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
           Object.keys(values).forEach((key) => {
             const field = form.elements.namedItem(key) as
@@ -175,7 +209,10 @@ function syncDeclarativeForms(mc: ModelContext): void {
           });
           if (typeof form.requestSubmit === "function") form.requestSubmit();
           else form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-          return { ok: true, data: { submitted: true, tool: name } };
+          return toMcpToolResponse(name, {
+            ok: true,
+            data: { submitted: true, tool: name },
+          });
         },
       });
       if (handle && typeof (handle as { unregister?: unknown }).unregister === "function") {

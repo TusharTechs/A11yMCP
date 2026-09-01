@@ -49,14 +49,20 @@
     };
 
     var mc = {
-      registerTool: function (tool) {
+      registerTool: function (tool, options) {
         tools.set(tool.name, tool);
         emit();
-        return {
-          unregister: function () {
-            if (tools.delete(tool.name)) emit();
-          },
+        var unregister = function () {
+          if (tools.get(tool.name) === tool && tools.delete(tool.name)) emit();
         };
+        // Spec lifecycle: aborting the signal passed to registerTool is how a
+        // registration is torn down. The handle is kept for older callers.
+        var signal = options && options.signal;
+        if (signal) {
+          if (signal.aborted) unregister();
+          else signal.addEventListener("abort", unregister, { once: true });
+        }
+        return { unregister: unregister };
       },
       unregisterTool: function (nameOrTool) {
         var name = typeof nameOrTool === "string" ? nameOrTool : nameOrTool && nameOrTool.name;
@@ -65,12 +71,17 @@
       getTools: function () {
         return Array.from(tools.values()).map(describe);
       },
-      executeTool: function (name, input, context) {
+      executeTool: function (target, input, context) {
+        // Native WebMCP is called as executeTool(toolDescriptor, jsonString);
+        // the app and older callers use executeTool(name, object). Accept both.
+        var name = typeof target === "string" ? target : (target && target.name) || "";
         var tool = tools.get(name);
         if (!tool) {
-          return Promise.resolve({ ok: false, error: { message: "Tool not found: " + name } });
+          return Promise.resolve(
+            mcpError("Tool not found: " + name, null)
+          );
         }
-        return Promise.resolve(tool.execute(input || {}, context));
+        return Promise.resolve(tool.execute(coerceInput(input), context));
       },
       addEventListener: function (type, listener) {
         if (type === "toolchange") listeners.add(listener);
@@ -86,11 +97,67 @@
 
   /* ---- helpers --------------------------------------------------------- */
 
+  /* ---- MCP tool results ------------------------------------------------
+   * WebMCP tools are MCP tools: execute() resolves to
+   * { content: [{ type: "text", text }] } plus machine-readable
+   * structuredContent and an isError flag. Agents read the text; programmatic
+   * callers read structuredContent, which carries the { ok, data } payload.
+   */
+  function coerceInput(input) {
+    if (input === null || input === undefined) return {};
+    if (typeof input === "string") {
+      var trimmed = input.trim();
+      if (!trimmed) return {};
+      try {
+        return JSON.parse(trimmed);
+      } catch (e) {
+        return input;
+      }
+    }
+    return input;
+  }
+
+  function mcp(text, structured, isError) {
+    return {
+      content: [{ type: "text", text: text }],
+      structuredContent: structured,
+      isError: !!isError,
+    };
+  }
+
+  function mcpError(message, nextAction) {
+    return mcp(
+      message + (nextAction ? " Next action: " + nextAction + "." : ""),
+      { ok: false, error: { message: message, nextAction: nextAction || null } },
+      true
+    );
+  }
+
+  function summarize(data) {
+    if (!data || typeof data !== "object") return "Done.";
+    var parts = [];
+    if (data.success === false) parts.push("no change applied");
+    if (data.taskAccessibility) parts.push("task accessibility " + data.taskAccessibility);
+    if (Array.isArray(data.capabilities)) parts.push(data.capabilities.length + " declared capabilities");
+    if (Array.isArray(data.notDeclared) && data.notDeclared.length) parts.push(data.notDeclared.length + " need(s) not declared");
+    if (Array.isArray(data.accepted)) parts.push(data.accepted.length + " accepted");
+    if (Array.isArray(data.rejected)) parts.push(data.rejected.length + " rejected");
+    if (Array.isArray(data.violations)) parts.push(data.violations.length + " violation(s)");
+    if (typeof data.beforeViolations === "number" && typeof data.afterViolations === "number") {
+      parts.push("violations " + data.beforeViolations + " -> " + data.afterViolations);
+    }
+    if (data.reversible === true) parts.push("reversible");
+    if (typeof data.revertedSteps === "number") parts.push(data.revertedSteps + " change(s) reverted");
+    if (Array.isArray(data.advisories) && data.advisories.length) parts.push(data.advisories.length + " advisory/ies");
+    if (Array.isArray(data.blockingInScope)) parts.push(data.blockingInScope.length + " blocking in scope");
+    return parts.length ? parts.join("; ") + "." : "Done.";
+  }
+
   function ok(data) {
-    return { ok: true, data: data };
+    return mcp(summarize(data), { ok: true, data: data }, false);
   }
   function err(message, nextAction) {
-    return { ok: false, error: { message: message, nextAction: nextAction || null } };
+    return mcpError(message, nextAction);
   }
   function isPlainObject(v) {
     return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -468,7 +535,8 @@
         description: form.getAttribute("tooldescription") || 'Submit the "' + name + '" form.',
         inputSchema: { type: "object", properties: props, required: [], additionalProperties: false },
         annotations: { readOnlyHint: false, declarative: true },
-        execute: function (input) {
+        execute: function (rawInput) {
+          var input = coerceInput(rawInput);
           input = input && typeof input === "object" ? input : {};
           Object.keys(input).forEach(function (k) {
             var field = form.elements.namedItem(k);
@@ -476,7 +544,7 @@
           });
           if (typeof form.requestSubmit === "function") form.requestSubmit();
           else form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-          return { ok: true, data: { submitted: true, tool: name } };
+          return ok({ submitted: true, tool: name });
         },
       });
     });

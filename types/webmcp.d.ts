@@ -38,15 +38,32 @@ declare global {
     unregister: () => void;
   }
 
+  /**
+   * Second argument to `registerTool`. Per the spec, aborting `signal` is
+   * how a registration is torn down; `exposedTo` limits which origins may
+   * see the tool.
+   */
+  interface WebMCPRegisterToolOptions {
+    signal?: AbortSignal;
+    exposedTo?: string[];
+    [key: string]: unknown;
+  }
+
   interface ModelContext {
     registerTool: (
-      tool: WebMCPToolDefinition
-    ) => WebMCPToolRegistration | void | unknown;
+      tool: WebMCPToolDefinition,
+      options?: WebMCPRegisterToolOptions
+    ) => WebMCPToolRegistration | Promise<unknown> | void | unknown;
+    /** Not part of the spec surface; present on the A11yMCP polyfill. */
     unregisterTool?: (tool: unknown) => void;
-    getTools?: () => unknown;
+    getTools?: (options?: { fromOrigins?: string[] }) => unknown;
+    /**
+     * Native WebMCP takes a tool descriptor from `getTools()` and a JSON
+     * string; the polyfill also accepts a tool name and a plain object.
+     */
     executeTool?: (
-      name: string,
-      input: unknown,
+      target: unknown,
+      input?: unknown,
       context?: WebMCPToolExecuteContext
     ) => unknown;
     addEventListener?: (type: "toolchange", listener: () => void) => void;

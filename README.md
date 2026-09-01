@@ -23,7 +23,7 @@
 
 | Judging criterion | How A11yMCP answers it | Where |
 |---|---|---|
-| **WebMCP implementation depth & skill** | Real `document.modelContext.registerTool` / `getTools` / `executeTool` / `unregisterTool` + `toolchange`. 20 imperative tools + 1 declarative form. **Task-scoped lifecycle** — commerce tools register only while a storefront is mounted. A **spec-compatible polyfill** means the same code path runs in every browser and stands down when a native implementation appears. | [`runtime.ts:66`](lib/webmcp/runtime.ts#L66) · [`polyfill.ts:36`](lib/webmcp/polyfill.ts#L36) · [`tools.ts:518`](lib/webmcp/tools.ts#L518) |
+| **WebMCP implementation depth & skill** | Real `document.modelContext.registerTool` / `getTools` / `executeTool` + `toolchange`. 20 imperative tools + 1 declarative form, every one returning an **MCP tool result** (`content` blocks + `structuredContent`). **Task-scoped lifecycle** via the spec's `AbortSignal`. A **spec-compatible polyfill** means the same code path runs in every browser and stands down when a native implementation appears — and a [native-conformance suite](tests/unit/native-conformance.test.ts) proves the app does not depend on the polyfill's leniency. | [`runtime.ts`](lib/webmcp/runtime.ts) · [`mcp.ts`](lib/webmcp/mcp.ts) · [`polyfill.ts`](lib/webmcp/polyfill.ts) |
 | **Complete, coherent product execution** | A full human journey — need → discover → audit → negotiate → approve → adapt → verify → buy — works end to end in `/demo`, **and** works on a plain static third-party page (`/partner`) via a 9 KB drop-in adapter. Landing, demo, inspector, partner site, deployed. | [`guided-demo.ts`](lib/agent/guided-demo.ts) · [`a11ymcp-adapter.js`](public/a11ymcp-adapter.js) |
 | **Credible real-world problem-solving impact** | Accessibility is the use case: ~1 in 6 people, and task completion (not a violation count) is the metric. The contract keeps the **site in control** of what it will adapt — the adoption model for e-commerce, banking, gov, health. | [`WHY_A11YMCP.md`](docs/WHY_A11YMCP.md) · [`FOR_WEBSITE_OWNERS.md`](docs/FOR_WEBSITE_OWNERS.md) |
 | **Creative & novel concept** | Not another form-filler. **Capability *negotiation*** — the site returns `accepted` / `partial (with limitation)` / `rejected (with reason)`, and the agent never fakes a capability the site didn't declare. | [`negotiation.ts:29`](lib/accessibility/negotiation.ts#L29) |
@@ -43,6 +43,9 @@ npm i && npm run test && npm run test:e2e && npm run eval:webmcp
 grep -n "document.modelContext.executeTool" lib/webmcp/runtime.ts tests/eval/*.ts
 # see the task-scoped lifecycle:
 grep -n "unregisterCommerceA11yTools\|registerCommerceA11yTools" components/fixture/LiveStorefront.tsx lib/webmcp/tools.ts
+# see the app driven by a STRICT native modelContext (no unregisterTool,
+# executeTool(descriptor, jsonString) only) — the polyfill can't paper over it:
+npx vitest run tests/unit/native-conformance.test.ts
 ```
 
 ---
@@ -165,6 +168,49 @@ through [`invokeTool`](lib/webmcp/runtime.ts#L141) →
 [`webmcp-transport-trace.json`](docs/evidence/webmcp-transport-trace.json)
 captures the chain.
 
+### Tools return MCP tool results
+
+WebMCP tools *are* MCP tools, so `execute()` resolves to an MCP tool result —
+not a bespoke shape an agent would have to guess at:
+
+```jsonc
+{
+  "content": [{ "type": "text",
+                "text": "verify_accessibility_profile: task accessibility PASS; 2 advisories." }],
+  "structuredContent": { "ok": true, "data": { "taskAccessibility": "PASS", "…": "…" } },
+  "isError": false
+}
+```
+
+The `content` block is what a model reads; `structuredContent` carries the
+exact `{ ok, data }` payload the UI, the guided agent and the benchmark
+consume. [`mcp.ts`](lib/webmcp/mcp.ts) wraps on the way out and unwraps on the
+way back in, so one shape serves both audiences.
+
+### Conformance with a *native* implementation
+
+The polyfill is deliberately forgiving, which makes it a bad oracle: code can
+pass against it and still break in the one browser that matters. So the app
+targets the native contract, and a strict stand-in proves it:
+
+| Spec behaviour | What A11yMCP does |
+|---|---|
+| `registerTool(def, { signal })` resolves a **promise** | awaited and error-handled; a returned handle is treated as a polyfill convenience |
+| unregistering is **`controller.abort()`** — there is no `unregisterTool` | aborting the registration signal is the primary teardown path; the handle and `unregisterTool` are fallbacks only |
+| `executeTool(toolDescriptor, jsonString, { signal })` | the descriptor is resolved from `getTools()` and arguments are JSON-encoded; the `(name, object)` form is retried only on an argument-shape error |
+| arguments arrive as a **JSON string** | every tool coerces string-or-object input before validation |
+| both APIs are gated by the `tools` Permissions Policy | `Permissions-Policy: tools=(self)` is sent on every route |
+
+[`tests/unit/native-conformance.test.ts`](tests/unit/native-conformance.test.ts)
+builds a `document.modelContext` that implements *only* that surface — no
+`unregisterTool`, and an `executeTool` that throws a `TypeError` for anything
+but a descriptor plus a JSON string — and drives register → discover →
+execute → unregister through it.
+
+For stable Chrome, set `WEBMCP_ORIGIN_TRIAL_TOKEN` in the **build**
+environment and the site sends an `Origin-Trial` header, so a visitor does
+not have to flip `chrome://flags/#enable-webmcp-testing`.
+
 ### Capability negotiation
 
 Most WebMCP demos expose actions. A11yMCP exposes a *negotiation*:
@@ -218,6 +264,7 @@ returns 15 on `/` and 21 on `/demo` (20 imperative + the declarative
 
 | | |
 |---|---|
+| **Conformance is tested against the strict contract, not the friendly one** | The polyfill accepts anything, so passing against it proved little. A strict native stand-in (promise-returning `registerTool`, no `unregisterTool`, descriptor + JSON string only) now gates the register/execute/unregister paths. |
 | **The transport is real, or an honest polyfill — never a private hook** | The benchmark used to reach into a `?eval=1` global. Now [`tests/eval/benchmark.spec.ts`](tests/eval/benchmark.spec.ts) calls `document.modelContext.executeTool` like any agent would. |
 | **Verification is scoped, so "PASS" means something** | Global "all audits pass" made the flagship keyboard task fail its own benchmark. Scoping to the negotiated profile is both more correct and on-thesis. |
 | **The adapter is decoupled from the app** | [`a11ymcp-adapter.js`](public/a11ymcp-adapter.js) is vanilla JS driven entirely by a manifest file — proof the contract model isn't wired into one framework. |
@@ -227,22 +274,22 @@ returns 15 on `/` and 21 on `/demo` (20 imperative + the declarative
 
 | Path | Role |
 |---|---|
-| `lib/webmcp/` | `runtime` (register/execute/lifecycle) · `polyfill` · `tools` (the 20 tools) · `schemas` |
+| `lib/webmcp/` | `runtime` (register/execute/lifecycle) · `mcp` (MCP result envelope) · `polyfill` · `tools` (the 20 tools) · `schemas` |
 | `lib/accessibility/` | `manifest` · `tree` · `audits` · `negotiation` · `remediation` · `verification` · `profiles` · `evidence-report` |
 | `lib/ecommerce/` | deterministic NOMA catalog / cart / checkout |
 | `lib/agent/` | `guided-demo` (a labelled, deterministic agent) · `intent-parser` |
 | `app/` | `/` landing · `/demo` · `/inspector` · `/.well-known/a11ymcp` · `/api/a11ymcp-manifest` |
 | `public/` | `a11ymcp-adapter.js` · `partner/` (static third-party page + its manifest) |
 | `a11ymcp-contract/` | manifest + adapter-manifest schemas · capability spec · adapter contract · two example site configs · README |
-| `tests/` | `unit/` (95) · `e2e/` (golden + negatives + adapter) · `eval/` (benchmark + transport trace) |
+| `tests/` | `unit/` (120, incl. native conformance + MCP envelope) · `e2e/` (golden + negatives + adapter) · `eval/` (benchmark + transport trace) |
 
 ## Evidence
 
 | Artifact | What it shows | Regenerate |
 |---|---|---|
-| [`docs/evidence/webmcp-transport-trace.json`](docs/evidence/webmcp-transport-trace.json) | `registerTool → getTools → executeTool`, schema + gate rejections, task-scoped `unregisterTool` | `npm run eval:webmcp` |
+| [`docs/evidence/webmcp-transport-trace.json`](docs/evidence/webmcp-transport-trace.json) | `registerTool → getTools → executeTool`, MCP-shaped results, the native `(descriptor, jsonString)` call shape, schema + gate rejections, task-scoped unregistration | `npm run eval:webmcp` |
 | [`public/eval-results.json`](public/eval-results.json) | measured WebMCP-vs-actuation benchmark (0.83 vs 0.17 task success) | `npm run eval:webmcp` |
-| `npm run test` | 95 unit tests — schemas, audits, negotiation, verification scoping, polyfill, security negatives | — |
+| `npm run test` | 120 unit tests — schemas, audits, negotiation, verification scoping, polyfill, **native conformance**, **MCP result envelope**, security negatives | — |
 | `npm run test:e2e` | golden purchase path, security negatives, **the drop-in adapter on the static page** | — |
 | `npm run eval:tools` | agent-first tool-description scorecard | — |
 | [`docs/evidence/external-agent-transcript.md`](docs/evidence/external-agent-transcript.md) | *optional* — a run in a browser with **native** WebMCP. Not captured; not a dependency of any claim. | — |
@@ -283,7 +330,7 @@ confirm the order. Then open `/inspector` and run **chain verification**, and
 the console).
 
 ```bash
-npm run test          # 95 unit tests
+npm run test          # 120 unit tests (incl. strict native-WebMCP conformance)
 npm run test:e2e      # golden path + security negatives + adapter
 npm run eval:tools    # tool-quality scorecard
 npm run eval:webmcp   # benchmark + transport trace -> writes JSON evidence
@@ -303,7 +350,7 @@ labelled as such (a native-WebMCP agent drives the identical tool path).
 
 Next.js 16 (App Router) · React 19 · TypeScript · Zod · `document.modelContext`
 (+ spec polyfill) · vanilla-JS drop-in adapter · Playwright · Vitest ·
-95 unit tests · reproducible benchmark · zero runtime dependencies beyond
+120 unit tests · reproducible benchmark · zero runtime dependencies beyond
 `next` / `react` / `zod`
 
 ## Demo video

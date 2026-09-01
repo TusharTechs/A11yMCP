@@ -12,3 +12,22 @@ The adapter is site-owned code that applies manifest directives. Rules:
 5. Approval-gated tools reject missing or false approval at the schema level.
 6. Verification is site-provided and task-scoped; it is evidence, not
    WCAG or legal certification.
+7. Tools return **MCP tool results**, because WebMCP tools are MCP tools:
+
+   ```jsonc
+   {
+     "content": [{ "type": "text", "text": "<one-line outcome for the model>" }],
+     "structuredContent": { "ok": true, "data": { /* machine payload */ } },
+     "isError": false
+   }
+   ```
+
+   The text block is what an agent reads; `structuredContent` carries the
+   payload for programmatic callers. Failures set `isError: true` and put the
+   reason — with a `nextAction` recovery hint where one exists — in both.
+8. Tools accept their arguments as either a JSON string or an object: a
+   native implementation calls `executeTool(toolDescriptor, jsonString)`.
+   Coerce before validating.
+9. Registrations are torn down by aborting the `AbortSignal` passed to
+   `registerTool(definition, { signal })`. Do not depend on a returned handle
+   or on `unregisterTool` — neither is in the spec.

@@ -67,9 +67,24 @@ async function wcall(
       if (!mc?.executeTool) {
         return { ok: false, error: { message: "document.modelContext.executeTool unavailable" } };
       }
-      const out = (await mc.executeTool(name, input)) as
-        | { ok: boolean; data?: unknown; error?: { message: string } }
-        | unknown;
+      const out: unknown = await mc.executeTool(name, input);
+      // WebMCP tools return an MCP tool result; the machine-readable
+      // { ok, data } payload rides in structuredContent.
+      const envelope = out as {
+        content?: Array<{ text?: string }>;
+        structuredContent?: unknown;
+        isError?: boolean;
+      } | null;
+      if (envelope && typeof envelope === "object" && Array.isArray(envelope.content)) {
+        const structured = envelope.structuredContent as
+          | { ok: boolean; data?: unknown; error?: { message: string } }
+          | undefined;
+        if (structured && typeof structured.ok === "boolean") return structured;
+        const text = (envelope.content ?? []).map((b) => b?.text ?? "").join("\n");
+        return envelope.isError
+          ? { ok: false, error: { message: text || "Tool reported an error." } }
+          : { ok: true, data: envelope.structuredContent ?? text };
+      }
       if (out && typeof out === "object" && "ok" in (out as object)) {
         return out as { ok: boolean; data?: unknown; error?: { message: string } };
       }

@@ -41,9 +41,16 @@ consequential order. Every tool call is dispatched through
 
 ## 9. Technical Architecture
 Next.js App Router; WebMCP runtime on `document.modelContext` with a
-spec-compatible polyfill when no native implementation is present;
-task-scoped tool lifecycle (`registerTool` / `unregisterTool` + `toolchange`);
-deterministic engine and commerce store; capability manifest served
+spec-compatible polyfill when no native implementation is present. Tools are
+MCP tools: every result is `content: [{ type: "text", text }]` plus
+`structuredContent` and `isError`. Task-scoped lifecycle uses the spec's
+`AbortSignal` (`registerTool(def, { signal })` → `controller.abort()`), and
+`executeTool` is dispatched in the native `(toolDescriptor, jsonString)`
+shape. `tests/unit/native-conformance.test.ts` drives the whole path through
+a strict stand-in that implements only the spec surface, so nothing depends
+on the polyfill's leniency. `Permissions-Policy: tools=(self)` on every
+route; optional Chrome 149 origin-trial token via `WEBMCP_ORIGIN_TRIAL_TOKEN`.
+Deterministic engine and commerce store; capability manifest served
 independently; zero external APIs or secrets.
 
 ## 10. Security

@@ -9,7 +9,21 @@ cannot discover support, cannot verify against the site's own contract, and
 mutates without consent (`unauthorized_mutations > 0`), while WebMCP does all
 four. `docs/evidence/webmcp-transport-trace.json` captures the real
 `registerTool → getTools → executeTool` chain, plus task-scoped
-`unregisterTool` on unmount.
+unregistration on unmount.
+
+## Browser engineer — "Does this actually work against a *native* implementation?"
+That is the question the polyfill cannot answer, so it is tested separately.
+`tests/unit/native-conformance.test.ts` builds a `document.modelContext` that
+implements only the documented spec surface — `registerTool(def, { signal })`
+returning a promise, **no `unregisterTool`**, and an `executeTool` that
+accepts a descriptor from `getTools()` plus a JSON string and throws a
+`TypeError` for anything else — and drives register → discover → execute →
+unregister through it. So the task-scoped lifecycle runs on
+`controller.abort()` (the spec's only defined teardown), arguments are
+JSON-encoded, and every tool coerces string-or-object input. The polyfill's
+handle and `unregisterTool` are fallbacks, never the primary path.
+`Permissions-Policy: tools=(self)` ships on every route, and a Chrome 149
+origin-trial token can be set at build time via `WEBMCP_ORIGIN_TRIAL_TOKEN`.
 
 ## Agent engineer — "Can an independent agent use the tools?"
 The tool surface is agent-first: descriptions carry when / when-not /
@@ -18,7 +32,10 @@ preconditions / failure-recovery, schemas are strict
 structured error. `eval:tools` scores this. Every call in the app is
 dispatched through `document.modelContext.executeTool` (native when the
 browser has it, otherwise the spec-compatible polyfill), so an agent that
-speaks WebMCP drives the same path the demo does. A recorded run in a
+speaks WebMCP drives the same path the demo does. Results come back as MCP
+tool results — a readable `content` text block plus `structuredContent`
+carrying the machine payload — so a model gets the outcome without parsing
+anything. A recorded run in a
 browser with *native* WebMCP is tracked as optional supplementary evidence
 in `docs/evidence/external-agent-transcript.md` and is not yet captured.
 
@@ -51,10 +68,11 @@ Negative proofs in `tests/unit/security.test.ts`,
 ## Hackathon judge — "Why does this beat other WebMCP projects?"
 Strongest idea (accessibility capability *negotiation*), a real
 implementation (20 tools + a declarative form, imperative + declarative APIs,
-task-scoped `registerTool`/`unregisterTool` lifecycle, `AbortSignal`
-cancellation, a spec-compatible polyfill), decoupled adoption (a static page
-made adaptable by a manifest + a script tag), reproducible evidence
-(transport trace + measured benchmark + 95 unit + e2e), and a complete human
+MCP-shaped tool results, task-scoped `AbortSignal` lifecycle, cancellation, a
+spec-compatible polyfill *and* a strict native-conformance suite), decoupled
+adoption (a static page made adaptable by a manifest + a script tag),
+reproducible evidence (transport trace + measured benchmark + 120 unit +
+e2e), and a complete human
 story (blocked task → negotiated adaptation → verified → completed purchase).
 Open gaps are listed honestly in `docs/STAGE_ONE_COMPLIANCE.md` rather than
 papered over.

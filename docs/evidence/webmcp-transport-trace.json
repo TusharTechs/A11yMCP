@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-08-30T09:16:22.778Z",
+  "capturedAt": "2026-09-01T14:02:23.520Z",
   "environment": "playwright chromium via npm run dev",
   "transport": "A11yMCP spec-compatible polyfill",
   "toolCount": 21,
@@ -32,6 +32,10 @@
   "readOk": true,
   "badSchemaRejected": true,
   "consequentialRejected": true,
+  "resultsAreMcpShaped": true,
+  "errorsFlagIsError": true,
+  "readSummaryText": "get_accessibility_capabilities: 4 declared capabilities; 3 needs not declared.",
+  "descriptorAndJsonStringAccepted": true,
   "commerceToolsUnregisteredOnUnmount": true,
   "coreToolsStillRegistered": true
 }

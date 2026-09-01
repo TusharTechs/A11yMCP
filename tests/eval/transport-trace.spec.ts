@@ -25,11 +25,27 @@ test("webmcp transport trace via document.modelContext", async ({ page }) => {
       document as unknown as {
         modelContext?: {
           getTools: () => Array<{ name: string; origin?: string }>;
-          executeTool: (n: string, i: unknown) => Promise<unknown>;
+          executeTool: (n: unknown, i: unknown) => Promise<unknown>;
           __a11ymcpPolyfill?: boolean;
         };
       }
     ).modelContext!;
+
+    type McpResult = {
+      content?: Array<{ type?: string; text?: string }>;
+      structuredContent?: { ok?: boolean };
+      isError?: boolean;
+    };
+    const structured = (r: unknown): { ok?: boolean } =>
+      ((r as McpResult)?.structuredContent ?? {}) as { ok?: boolean };
+    const isMcpShaped = (r: unknown): boolean => {
+      const blocks = (r as McpResult)?.content;
+      return (
+        Array.isArray(blocks) &&
+        blocks.length > 0 &&
+        blocks.every((b) => b?.type === "text" && typeof b.text === "string")
+      );
+    };
 
     const tools = mc.getTools();
     const read = await mc.executeTool("get_accessibility_capabilities", {});
@@ -41,6 +57,15 @@ test("webmcp transport trace via document.modelContext", async ({ page }) => {
       sessionId: "x",
       confirmation: false,
     });
+    // Native WebMCP calls executeTool(toolDescriptor, jsonString); the
+    // transport must accept that shape too, not just (name, object).
+    const capabilitiesTool = tools.find(
+      (t) => t.name === "get_accessibility_capabilities"
+    );
+    const nativeStyle = await mc.executeTool(
+      capabilitiesTool as unknown as string,
+      JSON.stringify({}) as unknown as unknown
+    );
 
     return {
       transport: mc.__a11ymcpPolyfill
@@ -49,10 +74,14 @@ test("webmcp transport trace via document.modelContext", async ({ page }) => {
       toolCount: tools.length,
       toolNames: tools.map((t) => t.name).sort(),
       toolOrigins: Array.from(new Set(tools.map((t) => t.origin ?? "native"))),
-      readOk: (read as { ok?: boolean }).ok === true,
-      badSchemaRejected: (badSchema as { ok?: boolean }).ok === false,
-      consequentialRejected:
-        (consequential as { ok?: boolean }).ok === false,
+      readOk: structured(read).ok === true,
+      badSchemaRejected: structured(badSchema).ok === false,
+      consequentialRejected: structured(consequential).ok === false,
+      resultsAreMcpShaped:
+        isMcpShaped(read) && isMcpShaped(badSchema) && isMcpShaped(consequential),
+      errorsFlagIsError: (badSchema as McpResult).isError === true,
+      readSummaryText: (read as McpResult).content?.[0]?.text ?? null,
+      descriptorAndJsonStringAccepted: structured(nativeStyle).ok === true,
     };
   });
 
@@ -90,6 +119,9 @@ test("webmcp transport trace via document.modelContext", async ({ page }) => {
   );
 
   expect(payload.readOk).toBe(true);
+  expect(payload.resultsAreMcpShaped).toBe(true);
+  expect(payload.errorsFlagIsError).toBe(true);
+  expect(payload.descriptorAndJsonStringAccepted).toBe(true);
   expect(payload.badSchemaRejected).toBe(true);
   expect(payload.consequentialRejected).toBe(true);
   expect(payload.commerceToolsUnregisteredOnUnmount).toBe(true);
