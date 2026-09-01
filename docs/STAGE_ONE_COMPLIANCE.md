@@ -28,6 +28,10 @@ Status key: [x] done · [~] partial · [ ] pending
       `tests/unit/native-conformance.test.ts`, which drives the app through a
       strict stand-in that implements *only* the spec surface, and by the
       `descriptorAndJsonStringAccepted` assertion in the transport trace.
+      The stand-in's call and return shapes were additionally checked against
+      the signatures in the shipping Chrome 152 binary, which is how a
+      return-type mismatch was found: native `executeTool` resolves a JSON
+      *string*, not an object. Fixed; the stand-in now serializes the same way.
 - [x] `Permissions-Policy: tools=(self)` sent on every route (Chrome gates
       both WebMCP APIs behind it). A Chrome 149 origin-trial token can be
       supplied via the `WEBMCP_ORIGIN_TRIAL_TOKEN` build-time env var so the

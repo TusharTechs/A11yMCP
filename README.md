@@ -211,7 +211,8 @@ way back in, so one shape serves both audiences.
 
 The polyfill is deliberately forgiving, which makes it a bad oracle: code can
 pass against it and still break in the one browser that matters. So the app
-targets the native contract, and a strict stand-in proves it:
+targets the native contract, checked against a strict stand-in **and against
+the signatures in the shipping Chrome binary**:
 
 | Spec behaviour | What A11yMCP does |
 |---|---|
@@ -219,13 +220,30 @@ targets the native contract, and a strict stand-in proves it:
 | unregistering is **`controller.abort()`** — there is no `unregisterTool` | aborting the registration signal is the primary teardown path; the handle and `unregisterTool` are fallbacks only |
 | `executeTool(toolDescriptor, jsonString, { signal })` | the descriptor is resolved from `getTools()` and arguments are JSON-encoded; the `(name, object)` form is retried only on an argument-shape error |
 | arguments arrive as a **JSON string** | every tool coerces string-or-object input before validation |
+| `executeTool` resolves a **JSON string**, not an object — and may resolve null | the result is parsed before unwrapping; a null resolution is reported as a failed call, not a successful empty one |
 | both APIs are gated by the `tools` Permissions Policy | `Permissions-Policy: tools=(self)` is sent on every route |
 
 [`tests/unit/native-conformance.test.ts`](tests/unit/native-conformance.test.ts)
 builds a `document.modelContext` that implements *only* that surface — no
-`unregisterTool`, and an `executeTool` that throws a `TypeError` for anything
-but a descriptor plus a JSON string — and drives register → discover →
-execute → unregister through it.
+`unregisterTool`, an `executeTool` that throws a `TypeError` for anything but
+a descriptor plus a JSON string, and results serialized the way the browser
+serializes them — and drives register → discover → execute → unregister
+through it.
+
+The last row of that table came from reading Chrome 152 rather than the docs.
+The shipping binary declares:
+
+```
+ScriptPromise<IDLNullable<IDLString>>
+blink::ModelContext::executeTool(ScriptState*, RegisteredTool*, String,
+                                 const ExecuteToolOptions*)
+```
+
+The result is JSON-**serialized**. The stand-in had been returning an object,
+because it was written from the published examples — so it certified an
+unwrapper that would have handed the UI a raw string on every native call.
+A test double is only as good as the contract you wrote it from, which is the
+most useful thing this project taught me.
 
 For stable Chrome, set `WEBMCP_ORIGIN_TRIAL_TOKEN` in the **build**
 environment and the site sends an `Origin-Trial` header, so a visitor does
