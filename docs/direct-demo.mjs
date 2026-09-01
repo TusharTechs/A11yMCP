@@ -102,6 +102,19 @@ const OVERLAY = () => {
       display: flex; gap: 9px; pointer-events: none;
       font: 700 21px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
     }
+    #demo-focus {
+      position: fixed; z-index: 2147483645; pointer-events: none;
+      border: 3px dashed #e11d8f; border-radius: 8px;
+      opacity: 0; transition: opacity 120ms ease;
+    }
+    #demo-focus::after {
+      content: "focus"; position: absolute;
+      inset-block-end: 100%; inset-inline-end: -3px; margin-block-end: 4px;
+      background: #e11d8f; color: #fff; border-radius: 4px;
+      padding: 2px 7px; white-space: nowrap;
+      font: 700 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .08em; text-transform: uppercase;
+    }
     #demo-keys span {
       background: rgba(15,23,42,.94); color: #f8fafc;
       border: 1px solid rgba(255,255,255,.24); border-bottom-width: 3px;
@@ -125,7 +138,9 @@ const OVERLAY = () => {
   let cursor = null;
   let ring = null;
   let keys = null;
+  let focusBox = null;
   let pending = null;
+  let focusOn = false;
 
   // addInitScript runs at document-start, before <head> and <body> exist, so
   // every DOM touch has to wait for the document to be ready. Getting this
@@ -149,7 +164,11 @@ const OVERLAY = () => {
     keys.id = "demo-keys";
     keys.setAttribute("aria-hidden", "true");
 
-    document.body.append(cursor, ring, keys);
+    focusBox = document.createElement("div");
+    focusBox.id = "demo-focus";
+    focusBox.setAttribute("aria-hidden", "true");
+
+    document.body.append(cursor, ring, keys, focusBox);
     if (pending) {
       window.__cursorTo(pending[0], pending[1]);
       pending = null;
@@ -169,6 +188,47 @@ const OVERLAY = () => {
     ring.style.insetInlineStart = `${x}px`;
     ring.style.insetBlockStart = `${y}px`;
   };
+
+  /**
+   * Draws where keyboard focus actually is.
+   *
+   * Before adaptation the storefront sets `outline: none !important` on
+   * `:focus`, so focus is genuinely invisible — that IS the barrier, but it
+   * makes for a scene where nothing appears to happen. This annotation is
+   * deliberately unlike a real focus ring (dashed, magenta, labelled) so it
+   * reads as the director pointing at something, never as a style the site
+   * provides. In the "after" scene it sits alongside the site's own solid
+   * blue ring, which is the whole comparison.
+   */
+  const drawFocus = () => {
+    if (!focusBox) return;
+    const el = document.activeElement;
+    if (!focusOn || !el || el === document.body || el === document.documentElement) {
+      focusBox.style.opacity = "0";
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) {
+      focusBox.style.opacity = "0";
+      return;
+    }
+    const pad = 4;
+    focusBox.style.opacity = "1";
+    focusBox.style.insetInlineStart = `${r.left - pad}px`;
+    focusBox.style.insetBlockStart = `${r.top - pad}px`;
+    focusBox.style.width = `${r.width + pad * 2}px`;
+    focusBox.style.height = `${r.height + pad * 2}px`;
+  };
+
+  window.__focusTracker = (on) => {
+    focusOn = Boolean(on);
+    drawFocus();
+  };
+
+  document.addEventListener("focusin", drawFocus, true);
+  document.addEventListener("focusout", () => setTimeout(drawFocus, 0), true);
+  window.addEventListener("scroll", drawFocus, true);
+  window.addEventListener("resize", drawFocus);
 
   window.__cursorClick = () => {
     if (!ring) return;
@@ -240,6 +300,11 @@ async function frame(page, locator, hold = 500) {
   await sleep(hold);
 }
 
+/** Turns the director's focus annotation on or off. */
+async function focusTracker(page, on) {
+  await page.evaluate((v) => window.__focusTracker?.(v), on).catch(() => {});
+}
+
 async function press(page, key, gap = 850) {
   await page.keyboard.press(key);
   await human(gap, 0.18);
@@ -261,12 +326,15 @@ const scenes = [
     run: async (page) => {
       const search = page.locator(S('input[type="search"]'));
       await frame(page, page.locator("#noma-fixture"), 700);
+      await focusTracker(page, true);
       await clickTarget(page, search);
       await sleep(600);
-      // Past the last product, and straight to Add to cart. The sizes are
-      // never focused, and no focus ring appears anywhere.
+      // Past the last product, and straight to Add to cart. The site draws no
+      // focus indicator at all here, so without the annotation this scene
+      // shows nothing moving — the barrier is literally invisible.
       for (let i = 0; i < 5; i++) await press(page, "Tab", 950);
-      await sleep(1800);
+      await sleep(2200);
+      await focusTracker(page, false);
     },
   },
 
@@ -322,6 +390,9 @@ const scenes = [
     run: async (page) => {
       const search = page.locator(S('input[type="search"]'));
       await frame(page, page.locator("#noma-fixture"), 700);
+      // Same annotation as scene 1 — but now the site's own solid blue ring
+      // is under it. That contrast is the point of the scene.
+      await focusTracker(page, true);
       await clickTarget(page, search);
       await sleep(600);
       await press(page, "Tab", 900);          // Search
@@ -331,7 +402,8 @@ const scenes = [
       await press(page, "ArrowRight", 1000);  // 9, and it selects as it moves
       await press(page, "ArrowRight", 900);   // 10
       await press(page, "ArrowLeft", 1100);   // back to 9
-      await sleep(2000);
+      await sleep(2400);
+      await focusTracker(page, false);
     },
   },
 
