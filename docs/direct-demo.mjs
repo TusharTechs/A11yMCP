@@ -381,7 +381,10 @@ const scenes = [
       await race
         .getByText(/ORDER PLACED — verified by the site/)
         .waitFor({ timeout: 60000 });
-      await frame(page, race, 600);
+      // Centre the verdict row, not the whole section: the lanes are ~960px
+      // tall and centring them puts the two verdicts off the bottom of the
+      // frame — and the verdicts are the shot.
+      await frame(page, race.locator(".race-verdict").first(), 600);
       await sleep(4500); // both verdicts in one frame — the thumbnail
     },
   },
