@@ -112,7 +112,11 @@ function createStrictNativeModelContext(): StrictNativeModelContext {
       const name = String((target as { name?: unknown }).name ?? "");
       const tool = tools.get(name);
       if (!tool) throw new Error(`Unknown tool: ${name}`);
-      return tool.execute(input, context);
+      // Chrome resolves executeTool with a *JSON string*, not an object:
+      //   ScriptPromise<IDLNullable<IDLString>> ModelContext::executeTool(...)
+      // Returning an object here is what let a real defect through once.
+      const result = await tool.execute(input, context);
+      return result === undefined ? null : JSON.stringify(result);
     },
 
     addEventListener(type, listener) {
@@ -181,10 +185,14 @@ describe("conformance against a strict native document.modelContext", () => {
     const descriptor = ((await native.getTools!()) as Array<{ name: string }>).find(
       (tool) => tool.name === "native_summary"
     );
-    const raw = (await native.executeTool!(
+    const wire = (await native.executeTool!(
       descriptor,
       JSON.stringify({ value: "hello" })
-    )) as {
+    )) as string;
+
+    // The wire format is a string, exactly as Chrome resolves it.
+    expect(typeof wire).toBe("string");
+    const raw = JSON.parse(wire) as {
       content: Array<{ type: string; text: string }>;
       structuredContent: { ok: boolean; data: unknown };
       isError: boolean;
@@ -225,10 +233,12 @@ describe("conformance against a strict native document.modelContext", () => {
     const descriptor = ((await native.getTools!()) as Array<{ name: string }>).find(
       (tool) => tool.name === "native_strict"
     );
-    const raw = (await native.executeTool!(
-      descriptor,
-      JSON.stringify({ query: "x", evil: "payload" })
-    )) as { isError: boolean; structuredContent: { ok: boolean } };
+    const raw = JSON.parse(
+      (await native.executeTool!(
+        descriptor,
+        JSON.stringify({ query: "x", evil: "payload" })
+      )) as string
+    ) as { isError: boolean; structuredContent: { ok: boolean } };
 
     expect(raw.isError).toBe(true);
     expect(raw.structuredContent.ok).toBe(false);
@@ -284,10 +294,9 @@ describe("conformance against a strict native document.modelContext", () => {
     const descriptor = ((await native.getTools!()) as Array<{ name: string }>).find(
       (tool) => tool.name === "native_json_input"
     );
-    const raw = (await native.executeTool!(
-      descriptor,
-      '{"value":"from-json-string"}'
-    )) as { structuredContent: { ok: boolean; data: unknown } };
+    const raw = JSON.parse(
+      (await native.executeTool!(descriptor, '{"value":"from-json-string"}')) as string
+    ) as { structuredContent: { ok: boolean; data: unknown } };
 
     expect(raw.structuredContent).toEqual({
       ok: true,

@@ -245,12 +245,35 @@ export async function invokeTool(
   return executeA11yTool(name, rawInput, options);
 }
 
-/** Turns whatever `executeTool` resolved to back into a {@link ToolResult}. */
+/**
+ * Turns whatever `executeTool` resolved to back into a {@link ToolResult}.
+ *
+ * Chrome's native implementation is
+ * `executeTool(...) -> Promise<string?>` — it hands back the tool result
+ * **JSON-serialized**, not as an object. Without parsing that first, every
+ * native call would fall through to `{ ok: true, data: "<raw json>" }` and
+ * the UI would receive a string where it expects data. A null resolution
+ * means the call produced no result.
+ */
 function unwrapToolOutput(output: unknown): ToolResult {
-  const unwrapped = fromMcpToolResponse(output);
+  let value = output;
+
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return { ok: true, data: value };
+    }
+  }
+
+  if (value === null || value === undefined) {
+    return { ok: false, error: { message: "The tool returned no result." } };
+  }
+
+  const unwrapped = fromMcpToolResponse(value);
   if (unwrapped) return unwrapped;
-  if (isToolResult(output)) return output;
-  return { ok: true, data: output };
+  if (isToolResult(value)) return value;
+  return { ok: true, data: value };
 }
 
 /** Finds the tool descriptor `getTools()` reports for a given tool name. */
