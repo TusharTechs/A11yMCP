@@ -7,11 +7,12 @@ import { useEventLog } from "@/hooks/use-event-log";
 import { getFixtureRoot } from "@/lib/accessibility/manifest";
 import { pushEventLog } from "@/lib/observability/event-log";
 import {
-  executeA11yTool,
+  invokeTool,
   getBrowserTools,
   getLocalTools,
-  isWebMCPSupported,
+  isNativeWebMCP,
   subscribeToolChange,
+  webmcpTransportLabel,
   type BrowserToolInfo,
   type ToolResult,
 } from "@/lib/webmcp/runtime";
@@ -87,7 +88,8 @@ const GROUPS: Array<{ title: string; names: string[] }> = [
   ];
 
 export default function InspectorPage() {
-  const [supported] = useState(isWebMCPSupported);
+  const [native, setNative] = useState(false);
+  const [transport, setTransport] = useState("server");
   const [browserTools, setBrowserTools] = useState<BrowserToolInfo[] | null>(
     null
   );
@@ -106,7 +108,12 @@ export default function InspectorPage() {
       getRoot: () => getFixtureRoot(),
     });
     registerWebMCPToolsOnce();
+    // client-only registry + transport detection; must run after mount
+    /* eslint-disable react-hooks/set-state-in-effect */
     setLocalTools(getLocalTools());
+    setNative(isNativeWebMCP());
+    setTransport(webmcpTransportLabel());
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     let cancelled = false;
     const refresh = () => {
@@ -135,7 +142,7 @@ export default function InspectorPage() {
       }));
       return;
     }
-    const result = await executeA11yTool(name, parsed);
+    const result = await invokeTool(name, parsed);
     setResults((prev) => ({ ...prev, [name]: result }));
   }
 
@@ -143,24 +150,30 @@ export default function InspectorPage() {
     <main id="main">
       <section className="panel">
         <h1>WebMCP inspector</h1>
-        <p className={supported ? "status-ok" : "status-warn"}>
-          {supported
-            ? "document.modelContext detected."
-            : "document.modelContext not detected in this browser."}
+        <p className={native ? "status-ok" : "status-warn"}>
+          {native
+            ? "Native document.modelContext detected — using the browser's WebMCP implementation."
+            : "No native WebMCP in this browser — A11yMCP installed a spec-compatible document.modelContext polyfill."}
         </p>
         <p className="muted">
-          The two sections below are deliberately separate: browser-visible
-          WebMCP tools are proof; the local demo registry is a development
-          fallback. They are never presented as the same thing.
+          Live tool transport: <strong>{transport}</strong>. Every invocation
+          below (and in /demo) is dispatched through
+          <code> document.modelContext.executeTool</code>. The polyfill
+          implements the same imperative surface as the W3C draft and stands
+          down the moment a native implementation is present.
         </p>
       </section>
 
-      <section className="panel" aria-label="Browser WebMCP tools">
-        <h2>Browser WebMCP tools</h2>
+      <section className="panel" aria-label="WebMCP tools via document.modelContext">
+        <h2>Tools via document.modelContext.getTools()</h2>
         {browserTools ? (
           <>
-            <p className="status-ok">
-              Browser-visible tools: {browserTools.length}
+            <p className={native ? "status-ok" : "muted"}>
+              {browserTools.length} tools returned by{" "}
+              <code>document.modelContext.getTools()</code>
+              {native
+                ? " (native browser implementation)."
+                : " (A11yMCP polyfill). This count changes as task-scoped tools register/unregister — open /demo to see commerce tools appear."}
             </p>
             <ul className="tool-list">
               {browserTools.map((tool) => (
@@ -176,9 +189,8 @@ export default function InspectorPage() {
           </>
         ) : (
           <p className="status-warn">
-            WebMCP unavailable in this browser. Local demo registry:{" "}
-            {localTools.length} tools (below). This fallback is not evidence
-            of browser-visible WebMCP.
+            document.modelContext.getTools() is not available in this
+            environment.
           </p>
         )}
       </section>
@@ -191,8 +203,8 @@ export default function InspectorPage() {
         <h2>Local demo registry ({localTools.length})</h2>
         <p className="muted">
           Development fallback and schema reference. Open /demo to mount the
-          NOMA fixture; fixture-backed tools return a structured "not
-          mounted" error otherwise.
+          NOMA fixture; fixture-backed tools return a structured &quot;not
+          mounted&quot; error otherwise.
         </p>
       </section>
 

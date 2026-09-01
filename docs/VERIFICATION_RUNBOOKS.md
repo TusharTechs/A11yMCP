@@ -2,16 +2,20 @@
 
 Run in order. Record outputs into docs/evidence/.
 
-## Runbook A — Chrome with WebMCP enabled
+## Runbook A — chain verification (any browser)
 
-1. Use a current Chrome build with WebMCP enabled (per current Chrome/WebMCP
-   docs: flag or origin trial as presently required).
-2. `npm run build && npm run start` (production build, localhost).
-3. Open http://localhost:3000/inspector.
-4. Confirm the "WebMCP runtime" section shows
-   `Browser-visible tools: 20` (19 imperative + 1 declarative where supported)
-   and NOT the "WebMCP unavailable" fallback.
-5. Click "Run chain verification". Required results:
+Works with or without native WebMCP: without it, A11yMCP installs a
+spec-compatible `document.modelContext` polyfill; with it (current Chrome
+build, flag/origin trial as required), the native implementation is used and
+the inspector banner says "Native document.modelContext detected".
+
+1. `npm run build && npm run start` (production build, localhost).
+2. Open http://localhost:3000/inspector.
+3. Confirm the transport banner and that
+   `document.modelContext.getTools()` lists the core tools (15). Open
+   http://localhost:3000/demo — the count rises to 20 as the storefront
+   registers task-scoped commerce tools; navigate away and it drops back.
+4. Click "Run chain verification". Required results:
    - registerTool → getTools: PASS
    - read tool via executeTool: PASS
    - invalid input rejection: PASS
@@ -20,27 +24,18 @@ Run in order. Record outputs into docs/evidence/.
    - approval-gated remediation: PASS or NA (fixture lives on /demo)
 6. Open http://localhost:3000/demo in the same browser and re-run chain
    verification; approval-gated remediation must now PASS.
-7. In DevTools console, verify directly:
-   `await document.modelContext.getTools()` lists A11yMCP tools.
-8. Save screenshots + console output to docs/evidence/chrome-webmcp/.
+7. `npm run eval:webmcp` regenerates `docs/evidence/webmcp-transport-trace.json`
+   and `public/eval-results.json`.
 
 If registration silently fails, fix types/webmcp.d.ts + lib/webmcp/runtime.ts
-only (isolated by design) and re-run.
++ lib/webmcp/polyfill.ts only (isolated by design) and re-run.
 
-## Runbook B — ChatGPT in-app browser (external real agent)
+## Runbook B — ChatGPT in-app browser (OPTIONAL, native-WebMCP agent)
 
-1. Deploy per Runbook C first (HTTPS required).
-2. In the ChatGPT desktop app, open the deployed URL in the in-app browser.
-3. Give the agent exactly this request:
-   "I can only use a keyboard. Please help me buy the NOMA Runner shoes on
-   this website. Use the website's WebMCP tools if it exposes them."
-4. Record: discovered tools, selected tools, arguments, results, failures,
-   retries, final outcome.
-5. Save the sanitized transcript to docs/evidence/external-agent-transcript.md
-   (template provided). Do not fabricate; if the agent fails, fix
-   descriptions/schemas and re-run.
-6. Repeat once with the low-vision request to capture the honest-rejection
-   behavior ("high contrast" must be reported unsupported).
+Optional supplementary evidence — not a dependency of any claim. See
+`docs/evidence/external-agent-transcript.md` for the runbook and status.
+Only meaningful in a browser that ships *native* WebMCP (so the native
+`document.modelContext` is exercised, not the polyfill).
 
 ## Runbook C — Deployment and repository
 

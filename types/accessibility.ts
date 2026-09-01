@@ -68,15 +68,21 @@ export interface VerificationCheck {
   title: string;
   pass: boolean;
   violationCount: number;
+  /** Whether this audit category is part of the negotiated profile. */
+  inScope?: boolean;
 }
 
 export interface VerificationResult {
   profile: string;
+  /** Negotiation id this verification was scoped to, or null for full-scope. */
+  profileId?: string | null;
   generatedAt: string;
   taskAccessibility: "PASS" | "BLOCKED";
   summary: "pass" | "fail";
   checks: VerificationCheck[];
   violations: AccessibilityViolation[];
+  /** Blocking/degrading issues outside the negotiated profile (not gating). */
+  advisories?: AccessibilityViolation[];
 }
 
 export const ALL_NEEDS = [

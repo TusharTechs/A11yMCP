@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function LandingPage() {
   return (
     <main id="main" className="landing">
@@ -9,14 +11,17 @@ export default function LandingPage() {
           result, and complete real tasks.
         </p>
         <div className="button-row">
-          <a className="cta" href="/demo">
+          <Link className="cta" href="/demo">
             Try the live demo
-          </a>
-          <a className="cta secondary" href="/#how">
+          </Link>
+          <Link className="cta secondary" href="/#how">
             How WebMCP works
-          </a>
-          <a className="cta secondary" href="/inspector">
+          </Link>
+          <Link className="cta secondary" href="/inspector">
             WebMCP inspector
+          </Link>
+          <a className="cta secondary" href="/partner">
+            Drop-in adapter demo
           </a>
         </div>
       </section>
@@ -45,6 +50,17 @@ export default function LandingPage() {
           them, and whether the change worked. With WebMCP, the agent sees
           structured capabilities, schemas, and current state — and can
           discover, select, invoke, and verify.
+        </p>
+
+        <h2>Any site can opt in</h2>
+        <p>
+          The <a href="/partner">Partner site demo</a> is a plain static HTML
+          page this app does not render. It became agent-adaptable by adding
+          one <code>&lt;link rel=&quot;a11ymcp-manifest&quot;&gt;</code> and one{" "}
+          <code>&lt;script src=&quot;/a11ymcp-adapter.js&quot;&gt;</code>. The
+          adapter reads the site-declared manifest and registers the same
+          discover → negotiate → approve → adapt → verify tool flow on{" "}
+          <code>document.modelContext</code>.
         </p>
       </section>
     </main>

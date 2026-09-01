@@ -1,0 +1,48 @@
+{
+  "protocol": "a11ymcp/0.5",
+  "site": "Vellum Books",
+  "disclaimer": "Prototype capability contract. Not an official standard; not a legal accessibility certification.",
+  "root": "#store",
+  "capabilities": [
+    {
+      "id": "accessible_names",
+      "title": "Accessible names",
+      "status": "supported",
+      "audit": "names",
+      "directives": [
+        { "selector": "[data-a11y=\"cart\"]", "setAttr": { "aria-label": "View cart" } },
+        { "selector": "[data-a11y=\"wishlist\"]", "setAttr": { "aria-label": "Save to wishlist" } }
+      ]
+    },
+    {
+      "id": "keyboard_navigation",
+      "title": "Keyboard navigation",
+      "status": "supported",
+      "audit": "keyboard",
+      "directives": [
+        { "selector": "[role=\"radiogroup\"]", "bindKeys": "radiogroup" }
+      ]
+    },
+    {
+      "id": "focus_visibility",
+      "title": "Visible focus",
+      "status": "supported",
+      "audit": "focus",
+      "directives": [
+        { "selector": "#store", "addClass": "a11y-focus" }
+      ]
+    },
+    {
+      "id": "form_labels",
+      "title": "Form labels and errors",
+      "status": "partial",
+      "limitation": "Labels are derived from each field's placeholder text.",
+      "audit": "forms",
+      "directives": [
+        { "selector": "#checkout input", "labelFromPlaceholder": true },
+        { "selector": "#checkout [data-error]", "announceErrors": true }
+      ]
+    }
+  ],
+  "notDeclared": ["high_contrast", "reduced_motion", "large_targets"]
+}

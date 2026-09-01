@@ -35,11 +35,16 @@ Site-provided, task-scoped verification tools; PASS/BLOCKED per task.
 
 ## 8. Human + Agent Collaboration
 Approval trust box for adaptations; literal confirmation for the
-consequential order; external real-agent transcript included.
+consequential order. Every tool call is dispatched through
+`document.modelContext.executeTool`; a captured chain trace is in
+`docs/evidence/webmcp-transport-trace.json`.
 
 ## 9. Technical Architecture
-Next.js App Router; isolated WebMCP runtime on document.modelContext;
-deterministic engine and commerce store; zero external APIs or secrets.
+Next.js App Router; WebMCP runtime on `document.modelContext` with a
+spec-compatible polyfill when no native implementation is present;
+task-scoped tool lifecycle (`registerTool` / `unregisterTool` + `toolchange`);
+deterministic engine and commerce store; capability manifest served
+independently; zero external APIs or secrets.
 
 ## 10. Security
 No arbitrary DOM tools; strict schemas; approval/confirmation gates;
@@ -53,6 +58,14 @@ sites declare adaptations; agents adapt per person; humans stay in control.
 Controlled demo site; supported barrier set; task-scoped evidence, not
 legal certification.
 
-## 13. Future Vision
+## 13. Adoption is one manifest + one script tag
+`/partner` ("Vellum Books") is a plain static HTML page this app does not
+render. `public/a11ymcp-adapter.js` (framework-free) reads its
+`<link rel="a11ymcp-manifest">` and registers the same discover → negotiate →
+approve → adapt → verify flow on `document.modelContext`. This is the
+adoption story for any site.
+
+## 14. Future Vision
 An agent-native accessibility layer as a web convention — see
-a11ymcp-contract/ and docs/FOR_WEBSITE_OWNERS.md.
+a11ymcp-contract/, the `/.well-known/a11ymcp` endpoint, and
+docs/FOR_WEBSITE_OWNERS.md.

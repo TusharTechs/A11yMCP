@@ -1,6 +1,5 @@
 import type {
   AuditResult,
-  EvidenceStep,
   RemediationCategory,
   RemediationResult,
   RemediationSnapshot,

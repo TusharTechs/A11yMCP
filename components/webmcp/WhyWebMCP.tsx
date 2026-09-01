@@ -50,7 +50,7 @@ export default function WhyWebMCP() {
             The website declares: capabilities, schemas, supported
             remediation, live state, and verification. The agent discovers,
             negotiates, applies scoped changes with approval, and verifies
-            against the site's own contract.
+            against the site&rsquo;s own contract.
           </p>
         </div>
       </div>

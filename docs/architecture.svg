@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1060" height="700" viewBox="0 0 1060 700" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" role="img" aria-label="A11yMCP architecture diagram">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#6b7a8d"/>
+    </marker>
+    <style>
+      .card { fill:#ffffff; stroke:#dbe2ec; stroke-width:1.5; }
+      .lane { fill:#f4f7fb; stroke:#dbe2ec; stroke-width:1.5; }
+      .accent { fill:#eaf2fb; stroke:#9cc3e8; stroke-width:1.5; }
+      .safe { fill:#eef7f0; stroke:#a6d5b0; stroke-width:1.5; }
+      .t   { fill:#1c2733; font-size:14px; }
+      .h   { fill:#0f1b28; font-size:15px; font-weight:700; }
+      .mut { fill:#5b6b7f; font-size:12.5px; }
+      .lbl { fill:#2b6cb0; font-size:12px; font-weight:700; letter-spacing:.06em; }
+      .flow{ stroke:#6b7a8d; stroke-width:1.6; fill:none; }
+      .num { fill:#2b6cb0; font-size:12px; font-weight:700; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1060" height="700" rx="16" fill="#fbfcfe" stroke="#e6ebf2"/>
+  <text x="32" y="42" class="h" font-size="20">A11yMCP — the contract between a human, an agent, and a website</text>
+  <text x="32" y="64" class="mut">user need → site-declared capability → agent negotiation → approved adaptation → verification → task completion</text>
+
+  <!-- Actors row -->
+  <rect x="32" y="92" width="180" height="70" rx="10" class="card"/>
+  <text x="122" y="122" text-anchor="middle" class="h">Human</text>
+  <text x="122" y="142" text-anchor="middle" class="mut">expresses a need</text>
+
+  <rect x="290" y="92" width="220" height="70" rx="10" class="card"/>
+  <text x="400" y="120" text-anchor="middle" class="h">Agent (in the browser)</text>
+  <text x="400" y="140" text-anchor="middle" class="mut">ChatGPT browser · Chrome ·</text>
+  <text x="400" y="155" text-anchor="middle" class="mut">any WebMCP client</text>
+
+  <rect x="590" y="92" width="438" height="70" rx="10" class="card"/>
+  <text x="809" y="120" text-anchor="middle" class="h">Website</text>
+  <text x="809" y="140" text-anchor="middle" class="mut">NOMA store (this app) · Vellum Books (static page + drop-in adapter)</text>
+  <text x="809" y="155" text-anchor="middle" class="mut">— first-class participant, not a target to be scraped</text>
+
+  <line x1="212" y1="127" x2="286" y2="127" class="flow" marker-end="url(#arw)"/>
+  <line x1="510" y1="127" x2="586" y2="127" class="flow" marker-start="url(#arw)" marker-end="url(#arw)"/>
+
+  <!-- WebMCP channel -->
+  <rect x="290" y="184" width="738" height="58" rx="10" class="accent"/>
+  <text x="308" y="207" class="lbl">WEBMCP CHANNEL &#8212; native document.modelContext, else A11yMCP spec-compatible polyfill</text>
+  <text x="308" y="228" class="t">registerTool  ·  getTools  ·  executeTool  ·  unregisterTool  ·  "toolchange" events  —  same code path everywhere</text>
+
+  <line x1="400" y1="162" x2="400" y2="182" class="flow" marker-end="url(#arw)"/>
+  <line x1="809" y1="162" x2="809" y2="182" class="flow" marker-end="url(#arw)"/>
+
+  <!-- Website internals -->
+  <rect x="290" y="262" width="738" height="300" rx="12" class="lane"/>
+  <text x="308" y="285" class="lbl">SITE-OWNED, DECLARED, REVERSIBLE</text>
+
+  <rect x="308" y="298" width="340" height="70" rx="9" class="card"/>
+  <text x="324" y="320" class="h" font-size="13.5">Capability manifest</text>
+  <text x="324" y="339" class="mut">/.well-known/a11ymcp — status supported | partial |</text>
+  <text x="324" y="354" class="mut">rejected, with limitations. Served independently.</text>
+
+  <rect x="664" y="298" width="348" height="70" rx="9" class="card"/>
+  <text x="680" y="320" class="h" font-size="13.5">20 WebMCP tools + 1 declarative form</text>
+  <text x="680" y="339" class="mut">discovery · negotiation · audits · remediation ·</text>
+  <text x="680" y="354" class="mut">verification · commerce — task-scoped lifecycle</text>
+
+  <rect x="308" y="384" width="704" height="74" rx="9" class="card"/>
+  <text x="324" y="406" class="h" font-size="13.5">Deterministic accessibility engine</text>
+  <text x="324" y="425" class="mut">accessibility tree · task-impact audits (blocking | degrading | informational) · capability negotiation ·</text>
+  <text x="324" y="440" class="mut">site-declared remediation directives · profile-scoped verification (PASS / BLOCKED + advisories)</text>
+
+  <rect x="308" y="474" width="340" height="70" rx="9" class="card"/>
+  <text x="324" y="496" class="h" font-size="13.5">Site-owned adapter</text>
+  <text x="324" y="515" class="mut">applies only declared directives, reversibly.</text>
+  <text x="324" y="530" class="mut">No arbitrary DOM. Every step evidenced.</text>
+
+  <rect x="664" y="474" width="348" height="70" rx="9" class="card"/>
+  <text x="680" y="496" class="h" font-size="13.5">Verification &amp; evidence</text>
+  <text x="680" y="515" class="mut">site-provided, task-scoped checks + a full</text>
+  <text x="680" y="530" class="mut">before → why → action → after → verify chain</text>
+
+  <!-- Safety footer -->
+  <rect x="32" y="596" width="996" height="72" rx="10" class="safe"/>
+  <text x="50" y="619" class="lbl" fill="#2f7d3f">SAFETY MODEL (enforced at the schema + runtime level)</text>
+  <text x="50" y="641" class="t">approval:true literal on remediation  ·  confirmation:true literal on orders  ·  strict schemas (additionalProperties:false)</text>
+  <text x="50" y="659" class="t">rollback for every adaptation  ·  structured errors carry nextAction hints  ·  AbortSignal cancellation  ·  full event log</text>
+
+  <!-- Journey rail -->
+  <rect x="32" y="184" width="230" height="378" rx="12" class="lane"/>
+  <text x="48" y="207" class="lbl">THE HUMAN JOURNEY</text>
+  <g>
+    <text x="48" y="236" class="num">1</text><text x="68" y="236" class="t">expresses a need</text>
+    <text x="48" y="264" class="num">2</text><text x="68" y="264" class="t">get_accessibility_capabilities</text>
+    <text x="48" y="292" class="num">3</text><text x="68" y="292" class="t">audit (task-scoped)</text>
+    <text x="48" y="320" class="num">4</text><text x="68" y="320" class="t">negotiate_accessibility_profile</text>
+    <text x="48" y="348" class="num">5</text><text x="68" y="348" class="t">human approval gate</text>
+    <text x="48" y="376" class="num">6</text><text x="68" y="376" class="t">apply site-declared remediation</text>
+    <text x="48" y="404" class="num">7</text><text x="68" y="404" class="t">verify_accessibility_profile</text>
+    <text x="48" y="432" class="num">8</text><text x="68" y="432" class="t">complete the real task</text>
+  </g>
+  <text x="48" y="470" class="mut">Unsupported needs are reported</text>
+  <text x="48" y="486" class="mut">as rejected — never faked.</text>
+  <text x="48" y="516" class="mut">Measured vs a browser-actuation</text>
+  <text x="48" y="532" class="mut">baseline: 0.83 vs 0.17 task</text>
+  <text x="48" y="548" class="mut">success, 0 vs 6 unauthorized</text>
+</svg>

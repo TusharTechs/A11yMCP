@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Static, framework-free assets served as-is (the drop-in adapter).
+    "public/**",
   ]),
 ]);
 

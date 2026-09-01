@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { ensureModelContext } from "./polyfill";
+
+export { isNativeWebMCP, isPolyfilledWebMCP, webmcpTransportLabel } from "./polyfill";
 
 export type ToolResult =
   | { ok: true; data: unknown }
@@ -46,6 +49,7 @@ export interface BrowserToolInfo {
 }
 
 const toolRegistry = new Map<string, StoredTool>();
+const registrationHandles = new Map<string, { unregister: () => void }>();
 
 function normalizeInput(input: unknown): unknown {
   return input === null || input === undefined ? {} : input;
@@ -74,12 +78,12 @@ export function registerA11yTool<TInput>(
 
   toolRegistry.set(stored.name, stored);
 
-  if (
-    typeof document !== "undefined" &&
-    typeof document.modelContext?.registerTool === "function"
-  ) {
+  // Install the spec-compatible polyfill if the browser has no native
+  // WebMCP, then register through whichever implementation is live.
+  const modelContext = ensureModelContext();
+  if (modelContext && typeof modelContext.registerTool === "function") {
     try {
-      document.modelContext.registerTool({
+      const handle = modelContext.registerTool({
         name: stored.name,
         title: stored.title,
         description: stored.description,
@@ -88,6 +92,9 @@ export function registerA11yTool<TInput>(
         execute: async (input: unknown, context?: WebMCPToolExecuteContext) =>
           executeA11yTool(stored.name, input, { signal: context?.signal }),
       });
+      if (handle && typeof (handle as { unregister?: unknown }).unregister === "function") {
+        registrationHandles.set(stored.name, handle as { unregister: () => void });
+      }
     } catch (error) {
       console.error(
         `[A11yMCP] Failed to register WebMCP tool: ${stored.name}`,
@@ -95,6 +102,73 @@ export function registerA11yTool<TInput>(
       );
     }
   }
+}
+
+/**
+ * Removes a tool from both the local registry and the live
+ * `document.modelContext`, emitting a `toolchange` event. Used for
+ * task-scoped tools (e.g. commerce tools that exist only while a
+ * storefront is mounted) so agents never see tools whose UI is gone.
+ */
+export function unregisterA11yTool(name: string): void {
+  toolRegistry.delete(name);
+
+  const handle = registrationHandles.get(name);
+  if (handle) {
+    handle.unregister();
+    registrationHandles.delete(name);
+    return;
+  }
+
+  const modelContext =
+    typeof document !== "undefined" ? document.modelContext : undefined;
+  if (modelContext && typeof modelContext.unregisterTool === "function") {
+    try {
+      modelContext.unregisterTool(name);
+    } catch (error) {
+      console.error(`[A11yMCP] Failed to unregister WebMCP tool: ${name}`, error);
+    }
+  }
+}
+
+/**
+ * Single execution path for the whole app. Routes through the live
+ * `document.modelContext.executeTool` (native or polyfill) so the demo,
+ * inspector and benchmark all exercise the real WebMCP transport rather
+ * than reaching into the registry. Falls back to the local validated
+ * executor only when no `document.modelContext` exists (server render).
+ */
+export async function invokeTool(
+  name: string,
+  rawInput: unknown,
+  options?: ToolExecutionContext
+): Promise<ToolResult> {
+  const modelContext =
+    typeof document !== "undefined" ? document.modelContext : undefined;
+
+  if (modelContext && typeof modelContext.executeTool === "function") {
+    try {
+      const output = await modelContext.executeTool(
+        name,
+        normalizeInput(rawInput),
+        { signal: options?.signal }
+      );
+      if (
+        output &&
+        typeof output === "object" &&
+        "ok" in (output as Record<string, unknown>)
+      ) {
+        return output as ToolResult;
+      }
+      return { ok: true, data: output };
+    } catch (error) {
+      return errorResult(
+        error instanceof Error ? error.message : `Execution failed for ${name}`
+      );
+    }
+  }
+
+  return executeA11yTool(name, rawInput, options);
 }
 
 export async function executeA11yTool(

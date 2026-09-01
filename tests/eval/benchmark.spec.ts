@@ -51,18 +51,29 @@ async function wcall(
 ): Promise<{ ok: boolean; data?: unknown; error?: { message: string } }> {
   return page.evaluate(
     async ({ name, input }) => {
-      const hook = (
-        window as unknown as {
-          __a11ymcp?: {
-            executeA11yTool: (
+      // Dispatch through the real WebMCP channel: document.modelContext
+      // .executeTool (native if the browser has it, otherwise the A11yMCP
+      // spec-compatible polyfill). Same path the UI uses.
+      const mc = (
+        document as unknown as {
+          modelContext?: {
+            executeTool?: (
               n: string,
               i: unknown
-            ) => Promise<{ ok: boolean; data?: unknown; error?: { message: string } }>;
+            ) => Promise<unknown> | unknown;
           };
         }
-      ).__a11ymcp;
-      if (!hook) return { ok: false, error: { message: "eval hook missing" } };
-      return hook.executeA11yTool(name, input);
+      ).modelContext;
+      if (!mc?.executeTool) {
+        return { ok: false, error: { message: "document.modelContext.executeTool unavailable" } };
+      }
+      const out = (await mc.executeTool(name, input)) as
+        | { ok: boolean; data?: unknown; error?: { message: string } }
+        | unknown;
+      if (out && typeof out === "object" && "ok" in (out as object)) {
+        return out as { ok: boolean; data?: unknown; error?: { message: string } };
+      }
+      return { ok: true, data: out };
     },
     { name, input }
   );
@@ -75,6 +86,17 @@ async function openSite(page: Page, site: "site-a" | "site-b"): Promise<void> {
       name: site === "site-a" ? "Site A (names/forms)" : "Site B (reduced motion)",
     })
     .click();
+  // Wait until the storefront has mounted and registered its task-scoped
+  // commerce tools on document.modelContext.
+  await page.waitForFunction(() => {
+    const mc = (
+      document as unknown as {
+        modelContext?: { getTools?: () => Array<{ name: string }> };
+      }
+    ).modelContext;
+    const tools = mc?.getTools?.() ?? [];
+    return tools.some((tool) => tool.name === "place_order");
+  });
 }
 
 /* ---------- Mode A: competent actuation agent ---------- */
@@ -131,6 +153,30 @@ class ActuationAgent {
     this.m.steps += 1;
     this.m.unauthorized_mutations += 1;
     await this.page.evaluate(js);
+  }
+
+  /** Inspect the rendered roles/names, as a competent DOM+a11y agent would. */
+  async readA11yTree(): Promise<number> {
+    this.m.steps += 1;
+    return this.page.evaluate(() => {
+      const root = document.querySelector("#noma-fixture");
+      if (!root) return 0;
+      return Array.from(root.querySelectorAll("*")).filter((el) => {
+        const role =
+          el.getAttribute("role") ??
+          el.tagName.toLowerCase();
+        return [
+          "button",
+          "link",
+          "a",
+          "input",
+          "select",
+          "textarea",
+          "radio",
+          "checkbox",
+        ].includes(role);
+      }).length;
+    });
   }
 
   async heuristicFocusProbe(): Promise<boolean> {
@@ -246,6 +292,7 @@ async function runT1(page: Page, site: string, mode: string): Promise<void> {
     });
   } else {
     const a = new ActuationAgent(page);
+    await a.readA11yTree();
     await a.injectDom(`
       (() => {
         const style = document.createElement("style");
@@ -265,8 +312,8 @@ async function runT1(page: Page, site: string, mode: string): Promise<void> {
       verification_method: probe ? "heuristic" : "none",
       metrics: a.m,
       notes: [
-        "Adaptation performed via arbitrary DOM injection without site consent or approval.",
-        "Verification is a self-built heuristic probe, not a declared check.",
+        "Read the accessibility tree, then adapted via arbitrary DOM/style injection: no way to discover which adaptations the site supports or to obtain consent.",
+        "Verification is a self-built heuristic focus probe, not a declared check; the agent cannot know if the adaptation actually unblocked the task.",
       ],
     });
   }
@@ -352,7 +399,10 @@ async function runT3(page: Page, site: string, mode: string): Promise<void> {
     const a = new ActuationAgent(page);
     const early = await a.typeByPlaceholder("Email", "alex@example.com");
     a.m.retries += 1;
-    await a.click("Add to cart") || (await a.clickRadio("9"), await a.click("Add to cart"));
+    if (!(await a.click("Add to cart"))) {
+      await a.clickRadio("9");
+      await a.click("Add to cart");
+    }
     await a.click("Checkout");
     const late = await a.typeByPlaceholder("Email", "alex@example.com");
     results.push({
@@ -537,11 +587,13 @@ test("webmcp vs actuation benchmark", async ({ page }) => {
     },
     methodology: {
       fairness:
-        "Same website, tasks, initial state, and browser for both modes; only the interaction interface differs. Actuation baseline is competent (text-based selectors, one retry per failure); its only adaptation strategy is arbitrary DOM injection.",
+        "Same website, tasks, initial state, and browser for both modes; only the interaction interface differs. The actuation baseline inspects rendered roles/names, uses role/name-based selectors, and retries once per failure. It is a reasonable DOM+a11y agent, but without a declared contract its only remediation strategy is arbitrary DOM/style injection and it has no declared verification. A model with vision would do better on some tasks; the delta this benchmark isolates is the contract (discovery, consent, declared verification, honest rejection), not raw capability.",
       honesty:
-        "If actuation outperforms WebMCP on any task, the result is recorded as measured. task_success for T2 (unsupported need) requires honest rejection; injection-based fakes count as failures.",
+        "If actuation outperforms WebMCP on any task, the result is recorded as measured (see T5, where injection 'succeeds' with an unauthorized mutation). task_success for T2 (unsupported need) requires honest rejection; injection-based fakes count as failures. WebMCP interventions are counted as costs, not hidden.",
+      scoping:
+        "T1 verification is scoped to the negotiated profile (keyboard + focus). Unlabeled checkout fields remain on the page and are reported by verify_accessibility_profile as advisories; they do not block a keyboard user who did not request screen-reader labels and that the site did not agree to adapt for this session.",
       transport:
-        "Mode B invokes the registered tool definitions through the validated executor exposed via ?eval=1; the real agent transport is the browser WebMCP channel (see docs/evidence/external-agent-transcript.md).",
+        "Both modes dispatch through document.modelContext.executeTool — native when the browser provides WebMCP, otherwise the A11yMCP spec-compatible polyfill (lib/webmcp/polyfill.ts). No private bypass. See docs/evidence/webmcp-transport-trace.md for a captured chain.",
     },
   };
 

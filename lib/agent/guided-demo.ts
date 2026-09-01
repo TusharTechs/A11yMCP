@@ -4,7 +4,7 @@ import {
   resetCommerce,
 } from "@/lib/ecommerce/cart";
 import {
-  executeA11yTool,
+  invokeTool,
   type ToolResult,
 } from "@/lib/webmcp/runtime";
 import type {
@@ -100,7 +100,7 @@ function summarize(tool: string, data: unknown): string {
 
 async function callTool(name: string, input: unknown): Promise<ToolResult> {
   agentPush("tool", `${name} ${JSON.stringify(input)}`, name);
-  const result = await executeA11yTool(name, input);
+  const result = await invokeTool(name, input);
 
   if (result.ok) {
     agentPush("result", summarize(name, result.data), name);
@@ -130,7 +130,7 @@ export async function runGuidedAgent(scenarioId: ScenarioId): Promise<void> {
 
   // Deterministic clean start.
   resetCommerce();
-  await executeA11yTool("rollback_all_remediations", {});
+  await invokeTool("rollback_all_remediations", {});
   agentPush("status", "Reset to original site state for a deterministic run.");
   await delay(STEP_DELAY_MS);
 

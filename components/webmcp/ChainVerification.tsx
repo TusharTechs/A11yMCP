@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import {
-  executeA11yTool,
-  executeBrowserTool,
   getBrowserTools,
+  invokeTool,
+  isNativeWebMCP,
+  webmcpTransportLabel,
 } from "@/lib/webmcp/runtime";
 import type { AuditResult } from "@/types/accessibility";
 
@@ -17,58 +18,55 @@ interface ChainResult {
 
 export default function ChainVerification() {
   const [results, setResults] = useState<ChainResult[]>([]);
+  const [transport, setTransport] = useState<string>("");
   const [running, setRunning] = useState(false);
 
   async function runChain(): Promise<void> {
     setRunning(true);
+    setTransport(webmcpTransportLabel());
+    const native = isNativeWebMCP();
+    const via = native
+      ? "document.modelContext (native)"
+      : "document.modelContext (A11yMCP spec polyfill)";
     const out: ChainResult[] = [];
 
+    // 1. registerTool -> getTools
     const browserTools = await getBrowserTools();
     if (!browserTools) {
       out.push({
         id: "discovery",
         label: "registerTool → getTools",
-        status: "na",
-        detail: "WebMCP unavailable in this browser; local registry only.",
+        status: "fail",
+        detail: "No document.modelContext.getTools available.",
       });
     } else {
       const names = browserTools.map((tool) => tool.name);
-      const visible = [
+      const core = [
         "get_accessibility_capabilities",
         "negotiate_accessibility_profile",
-        "place_order",
+        "verify_accessibility_profile",
       ].every((name) => names.includes(name));
       out.push({
         id: "discovery",
         label: "registerTool → getTools",
-        status: visible ? "pass" : "fail",
-        detail: `Browser-visible tools: ${browserTools.length}; core A11yMCP tools visible: ${visible}`,
+        status: core ? "pass" : "fail",
+        detail: `${browserTools.length} tools visible via getTools(); core A11yMCP tools present: ${core}. Transport: ${via}.`,
       });
     }
 
-    const viaBrowser = await executeBrowserTool(
-      "get_accessibility_capabilities",
-      {}
-    );
-    if (viaBrowser !== null) {
-      out.push({
-        id: "execute-read",
-        label: "executeTool (read)",
-        status: "pass",
-        detail: "Executed via document.modelContext.executeTool.",
-      });
-    } else {
-      const local = await executeA11yTool("get_accessibility_capabilities", {});
-      out.push({
-        id: "execute-read",
-        label: "executeTool (read)",
-        status: local.ok ? "pass" : "fail",
-        detail:
-          "WebMCP executeTool unavailable; executed via local validated executor.",
-      });
-    }
+    // 2. executeTool (read)
+    const read = await invokeTool("get_accessibility_capabilities", {});
+    out.push({
+      id: "execute-read",
+      label: "executeTool (read)",
+      status: read.ok ? "pass" : "fail",
+      detail: read.ok
+        ? `Executed through ${via}.`
+        : `Failed: ${read.error.message}`,
+    });
 
-    const repair = await executeA11yTool("repair_focus_management", {
+    // 3. executeTool (approval-gated remediation)
+    const repair = await invokeTool("repair_focus_management", {
       approval: true,
     });
     const repairOk =
@@ -88,17 +86,19 @@ export default function ChainVerification() {
             : repair.error.message,
     });
 
-    const invalid = await executeA11yTool("repair_focus_management", {});
+    // 4. invalid input rejection
+    const invalid = await invokeTool("repair_focus_management", {});
     out.push({
       id: "invalid",
       label: "invalid input rejection",
       status: !invalid.ok ? "pass" : "fail",
       detail: !invalid.ok
-        ? "Structured schema rejection returned."
+        ? "Structured schema rejection returned through executeTool."
         : "BUG: invalid input accepted.",
     });
 
-    const consequential = await executeA11yTool("place_order", {
+    // 5. consequential gate
+    const consequential = await invokeTool("place_order", {
       sessionId: "x",
       confirmation: false,
     });
@@ -111,9 +111,10 @@ export default function ChainVerification() {
         : "BUG: order placed without confirmation.",
     });
 
+    // 6. cancellation
     const controller = new AbortController();
     controller.abort();
-    const aborted = await executeA11yTool(
+    const aborted = await invokeTool(
       "audit_focus_visibility",
       {},
       { signal: controller.signal }
@@ -142,15 +143,22 @@ export default function ChainVerification() {
     <section className="panel" aria-label="WebMCP chain verification">
       <h2>WebMCP chain verification</h2>
       <p className="muted">
-        Verifies the real chain: registerTool → getTools → executeTool →
-        validation → state → cancellation. Never uses the local registry as
-        proof of browser-visible WebMCP.
+        Exercises the real chain through <code>document.modelContext</code>:
+        registerTool → getTools → executeTool → validation → gates →
+        cancellation. When a browser ships native WebMCP it is used
+        automatically; otherwise A11yMCP installs a spec-compatible polyfill so
+        the same code path runs everywhere.
       </p>
       <div className="button-row">
         <button type="button" disabled={running} onClick={() => void runChain()}>
           Run chain verification
         </button>
       </div>
+      {transport ? (
+        <p className={isNativeWebMCP() ? "status-ok" : "muted"}>
+          Live transport: <strong>{transport}</strong>
+        </p>
+      ) : null}
       {results.length > 0 ? (
         <ul className="tool-list">
           {results.map((result) => (

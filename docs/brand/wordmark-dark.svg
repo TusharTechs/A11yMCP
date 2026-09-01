@@ -1,0 +1,14 @@
+<svg width="360" height="72" viewBox="0 0 360 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A11yMCP — the Adaptive Web">
+  <defs>
+    <linearGradient id="wm-tile-d" x1="6" y1="6" x2="58" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5b9bd8"/>
+      <stop offset="1" stop-color="#2b6cb0"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="60" height="60" rx="15" fill="url(#wm-tile-d)"/>
+  <rect x="13.5" y="13.5" width="45" height="45" rx="10" fill="none" stroke="#0f2338" stroke-width="2" stroke-dasharray="5.5 4.5" opacity="0.85"/>
+  <circle cx="36" cy="25" r="4.2" fill="#0f2338"/>
+  <path d="M22 33 H50 M36 32 V45 M36 45 L28 56 M36 45 L44 56" stroke="#0f2338" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="86" y="37" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="30" font-weight="700" fill="#f1f5fb" letter-spacing="-0.3">A11yMCP</text>
+  <text x="86" y="57" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#93a6bd" letter-spacing="0.2">the adaptive web</text>
+</svg>

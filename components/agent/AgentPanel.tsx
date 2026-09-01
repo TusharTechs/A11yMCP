@@ -53,7 +53,7 @@ export default function AgentPanel() {
         <div className="trust-box" role="alertdialog" aria-label="Approval requested">
           <h3>Approval requested</h3>
           <p>WHAT: apply the accepted accessibility remediations</p>
-          <p>WHY: required for the user's negotiated profile</p>
+          <p>WHY: required for the user&rsquo;s negotiated profile</p>
           <p>SCOPE: NOMA fixture session</p>
           <p>RISK: low · REVERSIBLE: yes</p>
           <div className="button-row">

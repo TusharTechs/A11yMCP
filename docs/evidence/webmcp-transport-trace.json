@@ -1,0 +1,37 @@
+{
+  "capturedAt": "2026-08-30T09:16:22.778Z",
+  "environment": "playwright chromium via npm run dev",
+  "transport": "A11yMCP spec-compatible polyfill",
+  "toolCount": 21,
+  "toolNames": [
+    "add_product_to_cart",
+    "audit_accessible_names",
+    "audit_focus_visibility",
+    "audit_form_associations",
+    "audit_keyboard_navigation",
+    "begin_checkout",
+    "fill_checkout_form",
+    "get_accessibility_capabilities",
+    "get_accessibility_state",
+    "inspect_accessibility_tree",
+    "negotiate_accessibility_profile",
+    "place_order",
+    "repair_accessible_names",
+    "repair_focus_management",
+    "repair_form_associations",
+    "repair_keyboard_navigation",
+    "repair_reduced_motion",
+    "rollback_all_remediations",
+    "search_products",
+    "submit_accessibility_preferences",
+    "verify_accessibility_profile"
+  ],
+  "toolOrigins": [
+    "a11ymcp-polyfill"
+  ],
+  "readOk": true,
+  "badSchemaRejected": true,
+  "consequentialRejected": true,
+  "commerceToolsUnregisteredOnUnmount": true,
+  "coreToolsStillRegistered": true
+}

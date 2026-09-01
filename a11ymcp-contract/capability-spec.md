@@ -21,6 +21,14 @@ must be REJECTED by any honest agent. Silence is not support.
 keyboardNavigation · focusManagement · accessibleNames · formAssociation ·
 reducedMotion · contrast · largeTargets
 
+## Transport
+
+The manifest is published independently of the page bundle. Proposed
+well-known location: `/.well-known/a11ymcp` (this repo's demo serves it at
+`/api/a11ymcp-manifest`). Tools are registered on `document.modelContext`
+(the current WebMCP draft surface); task-scoped tools register and
+`unregisterTool` with their UI.
+
 ## Negotiation semantics
 
 1. Agent reads capabilities.

@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://a11ymcp.dev/contract/adapter-manifest.schema.json",
+  "title": "A11yMCP Drop-in Adapter Manifest",
+  "description": "The manifest read by public/a11ymcp-adapter.js from a page's <link rel=\"a11ymcp-manifest\">. Directives here are machine-applicable (unlike the descriptive `change` strings in manifest.schema.json). Prototype convention, not an official standard.",
+  "type": "object",
+  "required": ["site", "root", "capabilities", "notDeclared"],
+  "additionalProperties": true,
+  "properties": {
+    "protocol": { "type": "string" },
+    "site": { "type": "string" },
+    "disclaimer": { "type": "string" },
+    "root": { "type": "string", "description": "CSS selector for the adaptable region." },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "status", "directives"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "type": "string", "enum": ["supported", "partial"] },
+          "limitation": { "type": "string" },
+          "audit": {
+            "type": "string",
+            "enum": ["names", "keyboard", "focus", "forms"]
+          },
+          "directives": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["selector"],
+              "additionalProperties": false,
+              "properties": {
+                "selector": { "type": "string" },
+                "setAttr": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                },
+                "addClass": { "type": "string" },
+                "bindKeys": { "type": "string", "enum": ["radiogroup"] },
+                "labelFromPlaceholder": { "type": "boolean" },
+                "announceErrors": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "notDeclared": { "type": "array", "items": { "type": "string" } }
+  }
+}

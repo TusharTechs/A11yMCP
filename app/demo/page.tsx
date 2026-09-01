@@ -20,10 +20,7 @@ import {
   subscribeSite,
 } from "@/lib/accessibility/manifest";
 import { getRemediationHistory } from "@/lib/accessibility/remediation";
-import {
-  executeA11yTool,
-  type ToolResult,
-} from "@/lib/webmcp/runtime";
+import { invokeTool } from "@/lib/webmcp/runtime";
 import {
   ALL_NEEDS,
   type AccessibilityNeed,
@@ -74,6 +71,9 @@ export default function DemoPage() {
       };
       if (saved.site && saved.site !== getSiteId()) setSite(saved.site);
       if (Array.isArray(saved.needs) && saved.needs.length > 0) {
+        // one-time hydration from localStorage (not available during SSR,
+        // so a lazy initializer can't do this)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setNeedsSel(saved.needs);
       }
     } catch {
@@ -101,7 +101,7 @@ export default function DemoPage() {
     (async () => {
       const results: AuditResult[] = [];
       for (const name of AUDIT_TOOLS) {
-        const result = await executeA11yTool(name, {});
+        const result = await invokeTool(name, {});
         if (result.ok) results.push(result.data as AuditResult);
       }
       if (!cancelled) setAuditSummary(results);
@@ -112,12 +112,12 @@ export default function DemoPage() {
   }, [remediation, commerce, siteId]);
 
   async function runVerify(): Promise<void> {
-    const result = await executeA11yTool("verify_accessibility_profile", {});
+    const result = await invokeTool("verify_accessibility_profile", {});
     if (result.ok) setVerification(result.data as VerificationResult);
   }
 
   async function switchSite(id: SiteId): Promise<void> {
-    await executeA11yTool("rollback_all_remediations", {});
+    await invokeTool("rollback_all_remediations", {});
     setSite(id);
     persistProfile(needsSel, id);
   }
@@ -125,7 +125,7 @@ export default function DemoPage() {
   async function exportEvidence(): Promise<void> {
     const results: AuditResult[] = [];
     for (const name of AUDIT_TOOLS) {
-      const result = await executeA11yTool(name, {});
+      const result = await invokeTool(name, {});
       if (result.ok) results.push(result.data as AuditResult);
     }
     const manifest = getCurrentManifest();
@@ -152,7 +152,7 @@ export default function DemoPage() {
     event.preventDefault();
     if (needsSel.length === 0) return;
     persistProfile(needsSel, siteId);
-    void executeA11yTool("negotiate_accessibility_profile", {
+    void invokeTool("negotiate_accessibility_profile", {
       needs: needsSel,
     });
   }
@@ -174,8 +174,9 @@ export default function DemoPage() {
           <p className="group-label">User need</p>
           <p className="need-text">{utterance}</p>
           <p className="muted">
-            What am I looking at? 1) The agent negotiates with the site's
-            declared capabilities. 2) You approve reversible fixes. 3) The
+            What am I looking at? 1) The agent negotiates with the
+            site&rsquo;s declared capabilities. 2) You approve reversible
+            fixes. 3) The
             site adapts, verifies, and completes the task.
           </p>
         </div>

@@ -32,7 +32,7 @@ import {
 } from "@/lib/ecommerce/cart";
 import { findProduct } from "@/lib/ecommerce/catalog";
 import type { AccessibilityNeed } from "@/types/accessibility";
-import { registerA11yTool } from "./runtime";
+import { registerA11yTool, unregisterA11yTool } from "./runtime";
 import {
   AddToCartInputSchema,
   ApprovalInputSchema,
@@ -70,7 +70,6 @@ export interface AgentCallbacks {
   getRoot: () => Element | null;
 }
 
-type ApprovalInput = { approval: boolean };
 type NegotiateInput = { needs: AccessibilityNeed[] };
 type SearchInput = { query: string };
 type AddToCartInput = { productId: string; variantId: string };
@@ -87,7 +86,23 @@ type FillCheckoutInput = {
 type PlaceOrderInput = { sessionId: string; confirmation: true };
 
 let callbacks: AgentCallbacks | null = null;
-let toolsRegistered = false;
+let coreToolsRegistered = false;
+let commerceRefCount = 0;
+
+/**
+ * Commerce tools are task-scoped: they are registered only while a NOMA
+ * storefront is actually mounted on the page (see LiveStorefront) and are
+ * torn down on unmount. This follows the March 2026 WebMCP spec revision,
+ * which removed `provideContext` to discourage registering tools whose UI
+ * is not present ("ghost tools").
+ */
+export const COMMERCE_TOOL_NAMES = [
+  "search_products",
+  "add_product_to_cart",
+  "begin_checkout",
+  "fill_checkout_form",
+  "place_order",
+] as const;
 
 export function setAgentCallbacks(cb: AgentCallbacks): void {
   callbacks = cb;
@@ -112,9 +127,13 @@ function logEvent(type: AgentEventType, tool: string, message: string): void {
   requireCallbacks().logEvent({ type, tool, message });
 }
 
-export function registerWebMCPToolsOnce(): void {
-  if (toolsRegistered) return;
-  toolsRegistered = true;
+/**
+ * Registers the always-available tools: discovery, state, tree inspection,
+ * negotiation, audits, remediation and verification. Idempotent.
+ */
+export function registerCoreA11yTools(): void {
+  if (coreToolsRegistered) return;
+  coreToolsRegistered = true;
 
   registerA11yTool({
     name: "get_accessibility_capabilities",
@@ -135,6 +154,8 @@ export function registerWebMCPToolsOnce(): void {
         protocol: "a11ymcp/0.5",
         site: manifest.site,
         generatedAt: new Date().toISOString(),
+        manifestUrl: `/api/a11ymcp-manifest?site=${manifest.id}`,
+        wellKnown: "/.well-known/a11ymcp",
         capabilities: manifest.capabilities,
         notCurrentlyDeclared: manifest.notDeclared,
         taskTools: [
@@ -439,7 +460,7 @@ export function registerWebMCPToolsOnce(): void {
     name: "verify_accessibility_profile",
     title: "Verify accessibility profile",
     description:
-      "Re-runs all task-critical audits and returns PASS|BLOCKED plus per-check results. Call after every remediation batch and before proceeding to commerce; also call it to confirm a rollback restored the original state. Read-only; no approval required. If a check fails, call the matching audit tool for violation details.",
+      "Re-runs the task-critical audits and returns PASS|BLOCKED for the LAST negotiated profile (not every possible audit), plus per-check results with inScope flags and an advisories array for issues outside the negotiated profile. Call after every remediation batch and before proceeding to commerce; also call it to confirm a rollback restored the original state. Read-only; no approval required. If an in-scope check fails, call the matching audit tool for violation details.",
     inputSchema: emptyInputJsonSchema,
     annotations: { readOnlyHint: true },
     schema: EmptyInputSchema,
@@ -486,6 +507,16 @@ export function registerWebMCPToolsOnce(): void {
       return result;
     },
   });
+}
+
+/**
+ * Registers the task-scoped commerce tools. Ref-counted: the first caller
+ * registers the five tools, the last {@link unregisterCommerceA11yTools}
+ * tears them down. Call from a storefront component's mount effect.
+ */
+export function registerCommerceA11yTools(): void {
+  commerceRefCount += 1;
+  if (commerceRefCount > 1) return;
 
   registerA11yTool({
     name: "search_products",
@@ -603,4 +634,32 @@ export function registerWebMCPToolsOnce(): void {
       return result;
     },
   });
+}
+
+/** Releases one commerce-tool reference; tears the five tools down at zero. */
+export function unregisterCommerceA11yTools(): void {
+  if (commerceRefCount === 0) return;
+  commerceRefCount -= 1;
+  if (commerceRefCount > 0) return;
+
+  for (const name of COMMERCE_TOOL_NAMES) {
+    unregisterA11yTool(name);
+  }
+}
+
+/**
+ * Back-compat convenience: registers the full 20-tool surface at once
+ * (core + commerce). Used by the inspector (a static reference surface with
+ * no mounted fixture) and by unit tests. Interactive pages should prefer
+ * {@link registerCoreA11yTools} plus mount-scoped
+ * {@link registerCommerceA11yTools}.
+ */
+let fullSurfacePinned = false;
+
+export function registerWebMCPToolsOnce(): void {
+  registerCoreA11yTools();
+  if (!fullSurfacePinned) {
+    fullSurfacePinned = true;
+    registerCommerceA11yTools();
+  }
 }

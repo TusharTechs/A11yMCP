@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vellum Books — a WebMCP adapter demo</title>
+
+    <!-- The two lines that make this static page agent-adaptable: -->
+    <link rel="a11ymcp-manifest" href="/partner/a11ymcp.json" />
+    <script src="/a11ymcp-adapter.js" defer></script>
+
+    <style>
+      :root {
+        --ink: #1c1a17;
+        --paper: #f6f1e7;
+        --accent: #7c4a2d;
+        --line: #d9cdb8;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 16px/1.55 "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+        color: var(--ink);
+        background: var(--paper);
+      }
+      .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 80px; }
+      header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+      .brand { font-size: 22px; letter-spacing: 0.06em; text-transform: uppercase; }
+      .icons { display: flex; gap: 8px; }
+      .icon-btn {
+        border: 1px solid var(--line);
+        background: #fff;
+        width: 40px; height: 40px; border-radius: 999px;
+        display: grid; place-items: center; cursor: pointer;
+        color: var(--accent);
+      }
+      .note {
+        margin: 20px 0 28px; padding: 12px 14px;
+        border: 1px dashed var(--line); background: #fffdf7; font-size: 14px;
+      }
+      .book { display: flex; gap: 20px; padding: 20px 0; border-top: 1px solid var(--line); }
+      .cover {
+        width: 96px; height: 132px; flex: none; border-radius: 3px;
+        background: linear-gradient(160deg, #8a5a3b, #5c3721); color: #f6f1e7;
+        display: grid; place-items: center; text-align: center; padding: 8px; font-size: 12px;
+      }
+      h1 { font-size: 26px; margin: 0 0 4px; }
+      h2 { font-size: 18px; margin: 28px 0 10px; }
+      .price { color: var(--accent); font-weight: 700; }
+      .formats { display: flex; gap: 8px; margin: 12px 0; }
+      .format {
+        border: 1px solid var(--line); background: #fff; padding: 6px 14px; border-radius: 3px;
+        cursor: pointer; user-select: none;
+      }
+      .format[aria-checked="true"] { border-color: var(--accent); background: #f0e4d4; }
+      button.buy, button.pay {
+        border: 0; background: var(--accent); color: #fff; padding: 10px 18px;
+        border-radius: 3px; cursor: pointer; font: inherit;
+      }
+      form#checkout { margin-top: 12px; display: grid; gap: 10px; max-width: 360px; }
+      form#checkout input {
+        border: 1px solid var(--line); padding: 9px 10px; font: inherit; background: #fff;
+      }
+      [data-error] { color: #a3271b; font-size: 13px; min-height: 1.2em; }
+
+      /* The shipped defect: focus is invisible everywhere. */
+      :focus { outline: none; }
+
+      /* The site-declared, adapter-applied fix (directive: addClass a11y-focus). */
+      #store.a11y-focus :focus {
+        outline: 3px solid #2b6cb0;
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <section id="store">
+        <header>
+          <div class="brand">Vellum Books</div>
+          <div class="icons">
+            <!-- defect: icon buttons have no accessible name -->
+            <button class="icon-btn" data-a11y="wishlist" onclick="this.textContent='♥'">♡</button>
+            <button class="icon-btn" data-a11y="cart" onclick="this.textContent='🛒·1'">🛍</button>
+          </div>
+        </header>
+
+        <p class="note">
+          This is a plain static HTML page. It ships with four accessibility
+          defects. It became agent-adaptable by adding one
+          <code>&lt;link rel="a11ymcp-manifest"&gt;</code> and one
+          <code>&lt;script src="/a11ymcp-adapter.js"&gt;</code>. Open the
+          console to see the registered WebMCP tools.
+        </p>
+
+        <article class="book">
+          <div class="cover">The Salt Path — Raynor Winn</div>
+          <div>
+            <h1>The Salt Path</h1>
+            <p class="price">$18.00</p>
+            <p>A 630-mile walk along the South West Coast Path after losing everything.</p>
+
+            <!-- defect: role=radio divs are not keyboard focusable -->
+            <div class="formats" role="radiogroup" aria-label="Choose a format">
+              <div class="format" role="radio" aria-checked="true" onclick="pick(this)">Paperback</div>
+              <div class="format" role="radio" aria-checked="false" onclick="pick(this)">Hardcover</div>
+              <div class="format" role="radio" aria-checked="false" onclick="pick(this)">eBook</div>
+            </div>
+
+            <button class="buy" onclick="document.getElementById('co').hidden = false">Add to basket</button>
+          </div>
+        </article>
+
+        <div id="co" hidden>
+          <h2>Checkout</h2>
+          <form
+            id="checkout"
+            toolname="place_book_order"
+            tooldescription="Fill and submit the Vellum Books checkout form (email, name, address) to place the order."
+            onsubmit="return submitCheckout(event)"
+          >
+            <!-- defect: placeholder-only, no labels -->
+            <input type="email" name="email" placeholder="Email address" />
+            <input type="text" name="fullName" placeholder="Full name" />
+            <input type="text" name="address" placeholder="Shipping address" />
+            <p data-error></p>
+            <button class="pay" type="submit">Place order</button>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      function pick(el) {
+        el.parentElement
+          .querySelectorAll('[role="radio"]')
+          .forEach(function (r) { r.setAttribute("aria-checked", String(r === el)); });
+      }
+      function submitCheckout(e) {
+        e.preventDefault();
+        var inputs = e.target.querySelectorAll("input");
+        var err = e.target.querySelector("[data-error]");
+        var empty = Array.prototype.filter.call(inputs, function (i) { return !i.value.trim(); });
+        if (empty.length) {
+          err.textContent = "Please complete every field before placing your order.";
+          return false;
+        }
+        err.textContent = "";
+        e.target.innerHTML = "<p>Order placed. Thank you.</p>";
+        return false;
+      }
+    </script>
+  </body>
+</html>

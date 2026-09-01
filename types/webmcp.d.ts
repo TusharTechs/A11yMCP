@@ -34,11 +34,21 @@ declare global {
     ) => unknown | Promise<unknown>;
   }
 
+  interface WebMCPToolRegistration {
+    unregister: () => void;
+  }
+
   interface ModelContext {
-    registerTool: (tool: WebMCPToolDefinition) => unknown;
+    registerTool: (
+      tool: WebMCPToolDefinition
+    ) => WebMCPToolRegistration | void | unknown;
     unregisterTool?: (tool: unknown) => void;
     getTools?: () => unknown;
-    executeTool?: (name: string, input: unknown) => unknown;
+    executeTool?: (
+      name: string,
+      input: unknown,
+      context?: WebMCPToolExecuteContext
+    ) => unknown;
     addEventListener?: (type: "toolchange", listener: () => void) => void;
     removeEventListener?: (type: "toolchange", listener: () => void) => void;
   }
