@@ -123,14 +123,17 @@ registration and execution, a non-trivial workflow, a public repo and
 deployed URL, passing automated suites, a published demo video, and a
 third-party agent transcript.
 
-What is **not** claimed: no run against a browser's *native* WebMCP
-implementation has been captured. Everything recorded so far ran through the
-page's spec-compatible polyfill, which is what
-`docs/evidence/webmcp-transport-trace.json` reports. The native contract is
-covered by `tests/unit/native-conformance.test.ts`, whose call and return
-shapes were checked against the signatures in the shipping Chrome 152 binary
-— that check is how a return-type mismatch was found and fixed, and a test
-double is not the same thing as a browser.
+The ChatGPT run went through the browser's **native**
+`document.modelContext` — the agent read the transport badge back as
+`transport: native document.modelContext`, and the tool count corroborates
+it. So the tools have now been exercised by a third-party agent over a real
+native implementation, not only through the polyfill.
+
+What is still **not** claimed: `docs/evidence/webmcp-transport-trace.json` is
+a Playwright capture and correctly reports the polyfill, because Chromium has
+no WebMCP flag; it is not evidence about native. And the declarative-form fix
+that run produced (`d7d97dd`) has not itself been re-verified against a
+native browser yet.
 
 The ChatGPT run also reported that it sent `approval: true` without
 separately asking the human first. That is a genuine limitation of the trust

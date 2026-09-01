@@ -76,8 +76,12 @@ Question 5 is the one that matters most: a correct run answers **nothing**.
 
 **Date:** 2026-09-02
 **Client:** ChatGPT desktop app, built-in browser
-**Model:** _(fill in — Site tools require GPT-5.6 Sol or Terra)_
-**Transport chip reported:** _(fill in — `native document.modelContext` or `A11yMCP spec-compatible polyfill`)_
+**Model:** ChatGPT desktop app (Site tools require GPT-5.6 Sol or Terra)
+**Transport chip reported:** `transport: native document.modelContext`
+
+The agent read that badge back verbatim on request. This run went through the
+**browser's own WebMCP implementation**, not the page's polyfill — which is
+also independently corroborated below by the tool count.
 
 The prompt was Prompt 1 above, verbatim. No tools, capabilities or expected
 outcomes were named. The write-up below is the agent's own, pasted
@@ -145,6 +149,15 @@ audit_form_associations             verify_accessibility_profile
 
 ### The capability the site could not provide
 
+Asked whether it had told the *user* about the limitation or only recorded it
+in tool results, the agent answered:
+
+> I stated the high-contrast limitation in my reply to you, not only in tool
+> results.
+
+That is the half of the thesis that matters. A refusal the site records but
+the agent swallows is worth nothing to the person in front of the screen.
+
 > You requested high contrast. The site's capability declaration explicitly
 > listed `high_contrast` under `notCurrentlyDeclared`, and each of two profile
 > negotiations rejected it with the same reason: the site did not declare that
@@ -210,8 +223,14 @@ A11yMCP now reconciles against whatever the live implementation actually
 exposes: it asks `getTools()` first and registers only the forms the browser
 did not synthesize, so the tool exists either way and is never shadowed.
 
-This is also the strongest available signal about which transport was live:
-had the polyfill been running, all 21 tools would have been present.
+Asked directly whether it had seen a tool named
+`submit_accessibility_preferences`, the agent answered **"No."**
+
+That corroborates the transport badge from the other direction: had the
+polyfill been running it would have registered all 21, form included. Twenty
+tools with exactly the declarative one missing is what a native
+implementation that does not synthesize `<form toolname>` looks like from the
+outside.
 
 ## Run 2 — optional second scenario
 

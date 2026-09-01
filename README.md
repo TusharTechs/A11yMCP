@@ -45,7 +45,7 @@ tools are on `document.modelContext` and your agent can call them directly.
 | **Complete, coherent product execution** | A full human journey — need → discover → audit → negotiate → approve → adapt → verify → buy — works end to end in `/demo`, is reduced to one button in [`/demo?judge=1`](https://a11ymcp.vercel.app/demo?judge=1), **and** works on a plain static third-party page (`/partner`) via a drop-in adapter (8 KB gzipped). Landing, demo, judge mode, inspector, partner site, deployed. | [`JudgeMode.tsx`](components/judge/JudgeMode.tsx) · [`guided-demo.ts`](lib/agent/guided-demo.ts) · [`a11ymcp-adapter.js`](public/a11ymcp-adapter.js) |
 | **Credible real-world problem-solving impact** | Accessibility is the use case: ~1 in 6 people, and task completion (not a violation count) is the metric. The contract keeps the **site in control** of what it will adapt — the adoption model for e-commerce, banking, gov, health. | [`WHY_A11YMCP.md`](docs/WHY_A11YMCP.md) · [`FOR_WEBSITE_OWNERS.md`](docs/FOR_WEBSITE_OWNERS.md) |
 | **Creative & novel concept** | Not another form-filler. **Capability *negotiation*** — the site returns `accepted` / `partial (with limitation)` / `rejected (with reason)`, and the agent never fakes a capability the site didn't declare. The [live side-by-side proof](components/judge/ProofRace.tsx) runs an actuation agent and a WebMCP agent against the same page and shows where the first one has to start guessing. | [`negotiation.ts:29`](lib/accessibility/negotiation.ts#L29) · [`actuation-baseline.ts`](lib/agent/actuation-baseline.ts) |
-| Live deployed URL (works in a WebMCP browser) | https://a11ymcp.vercel.app — polyfill in any browser, native `document.modelContext` used automatically where present | [`deployment.md`](docs/evidence/deployment.md) |
+| Live deployed URL (works in a WebMCP browser) | https://a11ymcp.vercel.app — **verified end to end by ChatGPT's desktop browser over native `document.modelContext`**; the spec-compatible polyfill covers every other browser | [`deployment.md`](docs/evidence/deployment.md) |
 | Public repo + OSS license | This repo, **MIT** | [`LICENSE`](LICENSE) |
 | Demo video < 3 min, with audio | 2:59, narrated — the blocked task, the honest rejection, the approval gate, the adapted page, and the live side-by-side proof | [**▶ YouTube**](https://youtu.be/p1m6QgeKI6c) |
 
@@ -251,8 +251,9 @@ not have to flip `chrome://flags/#enable-webmcp-testing`.
 
 ### Driven by a third-party agent
 
-On 2026-09-02, ChatGPT's desktop-app browser was pointed at the deployed site
-and given one sentence — *"I can only use a keyboard, and I have low vision,
+On 2026-09-02, ChatGPT's desktop-app browser — running the **browser's own
+native `document.modelContext`**, not this page's polyfill — was pointed at
+the deployed site and given one sentence — *"I can only use a keyboard, and I have low vision,
 so I need high contrast. Help me buy the NOMA Runner in size 9"* — with no
 tools, capabilities or expected outcomes named.
 
@@ -264,6 +265,11 @@ the site had not offered, it answered:
 
 > **None. I did not inject arbitrary DOM changes or use undeclared repair
 > mechanisms.**
+
+Asked whether it had told the *user* that high contrast was unavailable, or
+only logged it: *"I stated the high-contrast limitation in my reply to you,
+not only in tool results."* A refusal the agent swallows is worth nothing to
+the person in front of the screen.
 
 It also reported five issues against this project, and one of them was a real
 bug: verification returned PASS for a profile where the site had accepted
