@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Meridian Transit — embedded widget</title>
+    <!--
+      A stand-in for somebody else's widget.
+
+      This is a plain static page on purpose. It is loaded inside a sandboxed
+      iframe *without* `allow-same-origin`, which gives it an opaque origin —
+      genuinely cross-origin to the page embedding it, with no shared globals,
+      no shared storage, and `postMessage` as the only channel. Framework
+      hydration does not survive that environment, and a third-party widget
+      shouldn't need our framework anyway.
+
+      It registers three tools and opts exactly two of them in to the
+      embedding origin via `registerTool(def, { exposedTo })`. The third is
+      never exposed, so it is invisible and un-runnable from outside. Anything
+      the embedder gets, it gets because this document decided to answer.
+
+      Mirrors lib/webmcp/federation.ts (the host half) and the exposedTo
+      handling in lib/webmcp/polyfill.ts.
+    -->
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0;
+        padding: 14px;
+        font: 13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: #ffffff;
+        color: #0f172a;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { background: #0f172a; color: #e2e8f0; }
+        .log li { background: #020617; }
+        dd { color: #e2e8f0; }
+      }
+      h1 { font-size: 1.05rem; margin: 0 0 0.2rem; }
+      .muted { color: #64748b; margin: 0 0 0.75rem; font-size: 0.85rem; }
+      dl {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 0.15rem 0.7rem;
+        margin: 0 0 0.85rem;
+        font-size: 0.82rem;
+      }
+      dt { font-weight: 600; color: #64748b; }
+      dd { margin: 0; font-family: ui-monospace, Menlo, monospace; word-break: break-word; }
+      .label {
+        font-size: 0.7rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin: 0 0 0.3rem;
+      }
+      .log { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+      .log li {
+        padding: 0.35rem 0.5rem;
+        border-left: 3px solid #cbd5e1;
+        background: #f1f5f9;
+        border-radius: 0 5px 5px 0;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 0.78rem;
+        word-break: break-word;
+      }
+      .log .listed, .log .executed { border-left-color: #16a34a; }
+      .log .denied-origin, .log .denied-tool { border-left-color: #dc2626; }
+    </style>
+  </head>
+  <body>
+    <h1>Meridian Transit</h1>
+    <p class="muted">
+      A third-party widget in a sandboxed iframe — an opaque origin, so
+      <code>postMessage</code> is the only way in.
+    </p>
+
+    <dl>
+      <dt>Trusts</dt>
+      <dd id="trusts">nothing — no embedder configured</dd>
+      <dt>Shares</dt>
+      <dd id="shares">no tools</dd>
+      <dt>Keeps private</dt>
+      <dd id="private">—</dd>
+    </dl>
+
+    <p class="label">Requests received</p>
+    <ol class="log" id="log" aria-live="polite">
+      <li class="muted">None yet.</li>
+    </ol>
+
+    <script>
+      (function () {
+        "use strict";
+
+        var CHANNEL = "a11ymcp/federation@1";
+
+        /* ---- the three tools ------------------------------------------ */
+
+        var TOOLS = [
+          {
+            name: "get_next_departures",
+            title: "Get next departures",
+            description:
+              "Returns the next departures from this stop, noting step-free access per service. Read-only.",
+            shared: true,
+            run: function () {
+              return {
+                stop: "Central Quay",
+                departures: [
+                  { line: "12", minutes: 4, stepFree: true },
+                  { line: "40", minutes: 9, stepFree: false },
+                  { line: "12", minutes: 17, stepFree: true },
+                ],
+              };
+            },
+          },
+          {
+            name: "get_step_free_route",
+            title: "Get a step-free route",
+            description:
+              "Returns a route that avoids stairs and escalators. Read-only.",
+            shared: true,
+            run: function () {
+              return {
+                stepFree: true,
+                legs: [
+                  "Central Quay → Riverside (line 12, ramp boarding)",
+                  "3 min level walk",
+                ],
+              };
+            },
+          },
+          {
+            name: "charge_travel_card",
+            title: "Charge the travel card",
+            description:
+              "Takes payment from the stored travel card. Consequential, and exposed to no embedding origin.",
+            shared: false,
+            run: function () {
+              return { charged: true };
+            },
+          },
+        ];
+
+        /* ---- a minimal modelContext that understands exposedTo -------- */
+
+        var registry = new Map();
+        var exposure = new Map();
+
+        var modelContext = {
+          registerTool: function (tool, options) {
+            registry.set(tool.name, tool);
+            // Default-deny: no exposedTo means same-origin only.
+            exposure.set(
+              tool.name,
+              options && Array.isArray(options.exposedTo)
+                ? options.exposedTo.map(String)
+                : null
+            );
+            return {
+              unregister: function () {
+                registry.delete(tool.name);
+                exposure.delete(tool.name);
+              },
+            };
+          },
+          getTools: function () {
+            return Array.from(registry.values()).map(function (tool) {
+              return {
+                name: tool.name,
+                title: tool.title,
+                description: tool.description,
+                inputSchema: tool.inputSchema,
+                annotations: tool.annotations,
+              };
+            });
+          },
+          executeTool: function (target, input) {
+            var name = typeof target === "string" ? target : target && target.name;
+            var tool = registry.get(name);
+            if (!tool) return Promise.resolve(null);
+            return Promise.resolve(tool.execute(input));
+          },
+        };
+        document.modelContext = modelContext;
+
+        function isExposedTo(name, origin) {
+          var declared = exposure.get(name);
+          return Array.isArray(declared) && declared.indexOf(origin) !== -1;
+        }
+
+        /* ---- UI ------------------------------------------------------- */
+
+        var logEl = document.getElementById("log");
+        var logged = 0;
+
+        function log(kind, detail) {
+          if (logged === 0) logEl.innerHTML = "";
+          logged += 1;
+          var li = document.createElement("li");
+          li.className = kind;
+          var strong = document.createElement("strong");
+          strong.textContent = kind + " ";
+          li.appendChild(strong);
+          li.appendChild(document.createTextNode(detail));
+          logEl.appendChild(li);
+          while (logEl.children.length > 8) logEl.removeChild(logEl.firstChild);
+        }
+
+        /* ---- registration --------------------------------------------- */
+
+        var configured = new URLSearchParams(location.search).get("embedder");
+        var shared = [];
+
+        TOOLS.forEach(function (tool) {
+          var options = {};
+          if (tool.shared && configured) options.exposedTo = [configured];
+          modelContext.registerTool(
+            {
+              name: tool.name,
+              title: tool.title,
+              description: tool.description,
+              inputSchema: { type: "object", additionalProperties: false },
+              annotations: { readOnlyHint: tool.shared },
+              execute: function () {
+                return {
+                  content: [
+                    { type: "text", text: tool.name + " ran inside the widget." },
+                  ],
+                  structuredContent: { ok: true, data: tool.run() },
+                  isError: false,
+                };
+              },
+            },
+            options
+          );
+          if (tool.shared) shared.push(tool.name);
+        });
+
+        document.getElementById("trusts").textContent =
+          configured || "nothing — no embedder configured";
+        document.getElementById("shares").textContent = configured
+          ? shared.join(", ")
+          : "no tools";
+        document.getElementById("private").textContent = TOOLS.filter(function (t) {
+          return !t.shared;
+        })
+          .map(function (t) {
+            return t.name;
+          })
+          .join(", ");
+
+        /* ---- the federation host -------------------------------------- */
+
+        window.addEventListener("message", function (event) {
+          var data = event.data;
+          if (!data || data.channel !== CHANNEL || typeof data.id !== "string") return;
+
+          var origin = event.origin;
+          function reply(body) {
+            body.channel = CHANNEL;
+            body.id = data.id;
+            // Answer only the origin that asked.
+            if (event.source) event.source.postMessage(body, origin === "null" ? "*" : origin);
+          }
+
+          // Gate 1: may this origin ask at all?
+          if (!configured || origin !== configured) {
+            log("denied-origin", origin + " is not the origin this widget trusts.");
+            reply({
+              ok: false,
+              error: "Origin " + origin + " may not access this document's tools.",
+            });
+            return;
+          }
+
+          if (data.op === "getTools") {
+            var all = modelContext.getTools();
+            var visible = all.filter(function (tool) {
+              return isExposedTo(tool.name, origin);
+            });
+            visible.forEach(function (tool) {
+              tool.origin = "opaque (sandboxed widget)";
+            });
+            log("listed", origin + " may see " + visible.length + " of " + all.length + " tools.");
+            reply({ ok: true, tools: visible });
+            return;
+          }
+
+          if (data.op === "executeTool") {
+            // Gate 2: is this specific tool exposed to this origin?
+            if (!isExposedTo(data.name, origin)) {
+              log("denied-tool", origin + ' asked for "' + data.name + '", which is not exposed to it.');
+              reply({
+                ok: false,
+                error: 'Tool "' + data.name + '" is not exposed to ' + origin + ".",
+              });
+              return;
+            }
+            Promise.resolve(modelContext.executeTool(data.name, data.input)).then(
+              function (raw) {
+                var result =
+                  raw && raw.structuredContent ? raw.structuredContent : { ok: true, data: raw };
+                log("executed", origin + ' executed "' + data.name + '".');
+                reply({ ok: true, result: result });
+              }
+            );
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

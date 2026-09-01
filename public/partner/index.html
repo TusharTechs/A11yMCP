@@ -93,6 +93,29 @@
           console to see the registered WebMCP tools.
         </p>
 
+        <!--
+          Declarative WebMCP tool WITH toolautosubmit: searching is harmless
+          and reversible, so an agent may run it outright.
+        -->
+        <form
+          class="search"
+          toolname="search_catalogue"
+          tooldescription="Search the Vellum Books catalogue and show the results. Read-only and reversible."
+          toolautosubmit
+          onsubmit="return runSearch(event)"
+        >
+          <label for="q">Search the catalogue</label>
+          <input
+            id="q"
+            type="search"
+            name="query"
+            required
+            toolparamdescription="Words to search the catalogue for, e.g. a title, an author, or a subject."
+          />
+          <button type="submit">Search</button>
+        </form>
+        <p id="search-result" class="note" role="status"></p>
+
         <article class="book">
           <div class="cover">The Salt Path — Raynor Winn</div>
           <div>
@@ -113,16 +136,39 @@
 
         <div id="co" hidden>
           <h2>Checkout</h2>
+          <!--
+            Declarative WebMCP tool WITHOUT toolautosubmit: placing an order
+            is consequential, so the agent may fill this form but the person
+            presses the button. That is what the attribute is for.
+          -->
           <form
             id="checkout"
-            toolname="place_book_order"
-            tooldescription="Fill and submit the Vellum Books checkout form (email, name, address) to place the order."
+            toolname="fill_book_order"
+            tooldescription="Fill the Vellum Books checkout form (email, name, shipping address). Does NOT place the order — the customer reviews the values and presses Place order."
             onsubmit="return submitCheckout(event)"
           >
             <!-- defect: placeholder-only, no labels -->
-            <input type="email" name="email" placeholder="Email address" />
-            <input type="text" name="fullName" placeholder="Full name" />
-            <input type="text" name="address" placeholder="Shipping address" />
+            <input
+              type="email"
+              name="email"
+              placeholder="Email address"
+              required
+              toolparamdescription="The customer's email address, used for the order receipt."
+            />
+            <input
+              type="text"
+              name="fullName"
+              placeholder="Full name"
+              required
+              toolparamdescription="The customer's full name as it should appear on the order."
+            />
+            <input
+              type="text"
+              name="address"
+              placeholder="Shipping address"
+              required
+              toolparamdescription="The full shipping address, including postal code."
+            />
             <p data-error></p>
             <button class="pay" type="submit">Place order</button>
           </form>
@@ -131,6 +177,15 @@
     </div>
 
     <script>
+      function runSearch(event) {
+        event.preventDefault();
+        var q = (document.getElementById("q").value || "").trim();
+        document.getElementById("search-result").textContent = q
+          ? 'Showing 1 result for "' + q + '": The Salt Path.'
+          : "Enter a search term.";
+        return false;
+      }
+
       function pick(el) {
         el.parentElement
           .querySelectorAll('[role="radio"]')

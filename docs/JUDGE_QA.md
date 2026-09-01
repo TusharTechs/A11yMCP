@@ -74,6 +74,31 @@ rejection; stale-state rejection with `nextAction` hints; everything logged.
 Negative proofs in `tests/unit/security.test.ts`,
 `tests/e2e/negative.spec.ts`, and the transport trace.
 
+## Spec author — "Did you implement the cross-origin story, or just the easy half?"
+It is implemented and demonstrated on `/inspector`. A widget runs in an
+iframe sandboxed *without* `allow-same-origin`, so it has an opaque origin —
+there is no shared JS context to cheat with, and `postMessage` is the only
+channel. It registers three tools and opts two in to the embedding origin
+with `registerTool(def, { exposedTo })`; the embedder holds `allow="tools"`,
+as the Permissions Policy requires. The embedder sees 2 of 3, and asking for
+the third by name is **refused with a reason** rather than silently missing —
+"you may not" and "there is nothing" are different answers. Reconfigure the
+widget to trust a different origin and it stops answering altogether. The
+frame decides; the embedder's `fromOrigins` is a statement of interest, not
+an entitlement. `tests/e2e/cross-origin.spec.ts` and
+`tests/unit/federation.test.ts`.
+
+## Spec author — "And the declarative API?"
+Schemas are derived from the markup rather than hand-written: input types and
+formats, `<select>` and radio-group enums, numeric bounds, `required`, and
+per-field descriptions from `toolparamdescription` (falling back to the
+label with nested controls stripped, then `aria-description`, then the
+placeholder). Fields that are not the agent's to set — hidden, password,
+file, submit — are never exposed. `toolautosubmit` is honoured, and the
+partner page uses both cases on purpose: `search_catalogue` autosubmits
+because searching is harmless; `fill_book_order` does not, because placing an
+order is consequential and a person should press the button.
+
 ## Skeptic — "Is the comparison rigged?"
 No, and you can watch it. The side-by-side proof runs both lanes live on the
 same fixture in front of you — it does not animate a stored result. The
@@ -90,11 +115,13 @@ where actuation wins.
 ## Hackathon judge — "Why does this beat other WebMCP projects?"
 Strongest idea (accessibility capability *negotiation*), a real
 implementation (20 tools + a declarative form, imperative + declarative APIs,
-MCP-shaped tool results, task-scoped `AbortSignal` lifecycle, cancellation, a
-spec-compatible polyfill *and* a strict native-conformance suite), decoupled
+MCP-shaped tool results, task-scoped `AbortSignal` lifecycle, cross-origin
+`exposedTo` across a real origin boundary, markup-derived declarative
+schemas, cancellation, a spec-compatible polyfill *and* a strict
+native-conformance suite), decoupled
 adoption (a static page made adaptable by a manifest + a script tag),
-reproducible evidence (transport trace + measured benchmark + 123 unit +
-e2e), and a complete human
+reproducible evidence (transport trace + measured benchmark + 142 unit +
+14 e2e), and a complete human
 story (blocked task → negotiated adaptation → verified → completed purchase).
 Open gaps are listed honestly in `docs/STAGE_ONE_COMPLIANCE.md` rather than
 papered over.

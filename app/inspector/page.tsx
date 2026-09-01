@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import ChainVerification from "@/components/webmcp/ChainVerification";
+import CrossOrigin from "@/components/webmcp/CrossOrigin";
 import WhyWebMCP from "@/components/webmcp/WhyWebMCP";
 import { useEventLog } from "@/hooks/use-event-log";
 import { getFixtureRoot } from "@/lib/accessibility/manifest";
@@ -196,6 +197,8 @@ export default function InspectorPage() {
       </section>
 
       <ChainVerification />
+
+      <CrossOrigin />
 
       <WhyWebMCP />
 

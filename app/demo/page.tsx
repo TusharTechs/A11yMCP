@@ -220,18 +220,29 @@ export default function DemoPage() {
           </button>
         </div>
 
+        {/*
+          Declarative WebMCP tool. No `toolautosubmit`: an agent may stage the
+          user's needs, but a person presses "Negotiate profile". The needs
+          checkboxes share a name, so the derived schema is an array with an
+          enum of the supported need ids.
+        */}
         <form
           toolname="submit_accessibility_preferences"
-          tooldescription="Submit the accessibility needs of the user so the site can negotiate an accessibility profile."
+          tooldescription="Stage the user's accessibility needs on this page so the site can negotiate an accessibility profile. Fills the form; the user submits it."
           onSubmit={handlePreferencesSubmit}
           className="pref-form"
         >
-          {ALL_NEEDS.map((need) => (
+          {ALL_NEEDS.map((need, index) => (
             <label key={need} className="pref-option">
               <input
                 type="checkbox"
                 name="needs"
                 value={need}
+                toolparamdescription={
+                  index === 0
+                    ? "The accessibility needs to request, as an array of need ids. Only ids this site declares can be satisfied; the rest are rejected with a reason."
+                    : undefined
+                }
                 checked={needsSel.includes(need)}
                 onChange={(event) => {
                   const next = event.target.checked

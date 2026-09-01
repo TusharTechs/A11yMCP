@@ -41,6 +41,22 @@ Status key: [x] done · [~] partial · [ ] pending
       makes a plain static page (`public/partner/index.html`, not rendered by
       this app) agent-adaptable via `<link rel="a11ymcp-manifest">` + one
       `<script>`. Covered by `tests/e2e/adapter.spec.ts`.
+- [x] **Cross-origin tool access**, the deepest part of the spec: a widget in
+      an iframe sandboxed without `allow-same-origin` (an opaque origin, so
+      `postMessage` is the only channel) registers three tools and exposes
+      two with `registerTool(def, { exposedTo })`. The embedder holds
+      `allow="tools"`, sees 2 of 3, and is refused by name — with a reason —
+      when it asks for the third. Reconfigure the widget to trust another
+      origin and it stops answering. `lib/webmcp/federation.ts`,
+      `public/tool-frame.html`, `tests/e2e/cross-origin.spec.ts`,
+      `tests/unit/federation.test.ts`.
+- [x] **Declarative API in full**: form schemas are derived from the markup
+      (input types and formats, select/radio enums, numeric bounds,
+      `required`) with per-field descriptions from `toolparamdescription`,
+      falling back to the label, `aria-description`, then the placeholder.
+      `toolautosubmit` is honoured: without it a tool fills the form and
+      stops. The partner page uses both cases deliberately — search
+      autosubmits, placing an order does not.
 - [x] Manifest served independently at `/.well-known/a11ymcp` (and
       `/api/a11ymcp-manifest`).
 - [x] A judge can see the whole thesis in sixty seconds without reading

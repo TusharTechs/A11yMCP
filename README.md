@@ -41,8 +41,8 @@ tools are on `document.modelContext` and your agent can call them directly.
 
 | Judging criterion | How A11yMCP answers it | Where |
 |---|---|---|
-| **WebMCP implementation depth & skill** | Real `document.modelContext.registerTool` / `getTools` / `executeTool` + `toolchange`. 20 imperative tools + 1 declarative form, every one returning an **MCP tool result** (`content` blocks + `structuredContent`). **Task-scoped lifecycle** via the spec's `AbortSignal`. A **spec-compatible polyfill** means the same code path runs in every browser and stands down when a native implementation appears — and a [native-conformance suite](tests/unit/native-conformance.test.ts) proves the app does not depend on the polyfill's leniency. | [`runtime.ts`](lib/webmcp/runtime.ts) · [`mcp.ts`](lib/webmcp/mcp.ts) · [`polyfill.ts`](lib/webmcp/polyfill.ts) |
-| **Complete, coherent product execution** | A full human journey — need → discover → audit → negotiate → approve → adapt → verify → buy — works end to end in `/demo`, is reduced to one button in [`/demo?judge=1`](https://a11ymcp.vercel.app/demo?judge=1), **and** works on a plain static third-party page (`/partner`) via a 9 KB drop-in adapter. Landing, demo, judge mode, inspector, partner site, deployed. | [`JudgeMode.tsx`](components/judge/JudgeMode.tsx) · [`guided-demo.ts`](lib/agent/guided-demo.ts) · [`a11ymcp-adapter.js`](public/a11ymcp-adapter.js) |
+| **WebMCP implementation depth & skill** | Real `document.modelContext.registerTool` / `getTools` / `executeTool` + `toolchange`. 20 imperative tools + declarative form tools whose schemas are **derived from the markup** (types, enums, required, `toolparamdescription`, `toolautosubmit`), every result an **MCP tool result** (`content` blocks + `structuredContent`). **Task-scoped lifecycle** via the spec's `AbortSignal`. **Cross-origin `exposedTo` / `fromOrigins`** with a real sandboxed-frame demo. A **spec-compatible polyfill** means the same code path runs everywhere and stands down when a native implementation appears — and a [native-conformance suite](tests/unit/native-conformance.test.ts) proves the app does not depend on the polyfill's leniency. | [`runtime.ts`](lib/webmcp/runtime.ts) · [`mcp.ts`](lib/webmcp/mcp.ts) · [`declarative.ts`](lib/webmcp/declarative.ts) · [`federation.ts`](lib/webmcp/federation.ts) |
+| **Complete, coherent product execution** | A full human journey — need → discover → audit → negotiate → approve → adapt → verify → buy — works end to end in `/demo`, is reduced to one button in [`/demo?judge=1`](https://a11ymcp.vercel.app/demo?judge=1), **and** works on a plain static third-party page (`/partner`) via a drop-in adapter (8 KB gzipped). Landing, demo, judge mode, inspector, partner site, deployed. | [`JudgeMode.tsx`](components/judge/JudgeMode.tsx) · [`guided-demo.ts`](lib/agent/guided-demo.ts) · [`a11ymcp-adapter.js`](public/a11ymcp-adapter.js) |
 | **Credible real-world problem-solving impact** | Accessibility is the use case: ~1 in 6 people, and task completion (not a violation count) is the metric. The contract keeps the **site in control** of what it will adapt — the adoption model for e-commerce, banking, gov, health. | [`WHY_A11YMCP.md`](docs/WHY_A11YMCP.md) · [`FOR_WEBSITE_OWNERS.md`](docs/FOR_WEBSITE_OWNERS.md) |
 | **Creative & novel concept** | Not another form-filler. **Capability *negotiation*** — the site returns `accepted` / `partial (with limitation)` / `rejected (with reason)`, and the agent never fakes a capability the site didn't declare. The [live side-by-side proof](components/judge/ProofRace.tsx) runs an actuation agent and a WebMCP agent against the same page and shows where the first one has to start guessing. | [`negotiation.ts:29`](lib/accessibility/negotiation.ts#L29) · [`actuation-baseline.ts`](lib/agent/actuation-baseline.ts) |
 | Live deployed URL (works in a WebMCP browser) | https://a11ymcp.vercel.app — polyfill in any browser, native `document.modelContext` used automatically where present | [`deployment.md`](docs/evidence/deployment.md) |
@@ -157,7 +157,7 @@ accessibility defects. It became agent-adaptable by adding two lines:
 <script src="/a11ymcp-adapter.js" defer></script>
 ```
 
-[`a11ymcp-adapter.js`](public/a11ymcp-adapter.js) (~9 KB, no framework) reads
+[`a11ymcp-adapter.js`](public/a11ymcp-adapter.js) (8 KB gzipped, no framework) reads
 the site-declared manifest, installs the WebMCP polyfill if the browser has
 no native implementation, and registers the same
 discover → negotiate → **approve** → adapt → verify → roll back flow
@@ -229,6 +229,58 @@ For stable Chrome, set `WEBMCP_ORIGIN_TRIAL_TOKEN` in the **build**
 environment and the site sends an `Origin-Trial` header, so a visitor does
 not have to flip `chrome://flags/#enable-webmcp-testing`.
 
+### Cross-origin tools: `exposedTo`, and default-deny
+
+Most of the WebMCP surface is same-page. The interesting half is what
+happens when one origin embeds another, and the spec answers it in three
+parts that only mean something together: the embedder must grant the frame
+`allow="tools"`; the framed document opts each tool in to a named foreign
+origin with `registerTool(def, { exposedTo })`; the embedder asks with
+`getTools({ fromOrigins })`.
+
+[`/inspector`](https://a11ymcp.vercel.app/inspector) runs it. A third-party
+widget sits in an iframe sandboxed **without** `allow-same-origin`, so it has
+an opaque origin — no shared globals, no shared storage, `postMessage` as the
+only channel. It registers three tools and exposes two:
+
+| | |
+|---|---|
+| `getTools()` from the embedder | **2 of 3** — the third was never exposed |
+| `executeTool("charge_travel_card")` | **refused by name**, with a reason |
+| the widget reconfigured to trust another origin | stops answering entirely |
+
+"You may not" and "there is nothing" are different answers, and the widget
+gives the right one. [`federation.ts`](lib/webmcp/federation.ts) is the
+TypeScript reference implementation;
+[`tool-frame.html`](public/tool-frame.html) mirrors the host half in vanilla
+JS, because a third-party widget shouldn't need your framework.
+
+### Declarative tools, derived from the markup
+
+A `<form toolname>` becomes a tool whose schema is read off the fields —
+input types and formats, `<select>` and radio-group enums, numeric bounds,
+`required`, and per-field descriptions from `toolparamdescription` (falling
+back to the label, then `aria-description`, then the placeholder).
+
+`toolautosubmit` is the part worth dwelling on. Without it the tool fills the
+form and **stops**. The partner page uses both, deliberately:
+
+| Form | `toolautosubmit` | Why |
+|---|---|---|
+| `search_catalogue` | yes | searching is harmless and reversible |
+| `fill_book_order` | **no** | placing an order is consequential — the agent may prepare it, a person presses the button |
+
+### Try it on any page
+
+A [bookmarklet](public/a11ymcp-probe.js) reports what any page looks like to
+an agent: the WebMCP transport, how many tools the page registers, and
+whether it declares an accessibility capability contract. On almost every
+site the answer is *none*, which is the argument.
+
+It deliberately does **not** adapt the page it runs on. Changing someone
+else's site uninvited is exactly the overlay behaviour A11yMCP exists to
+replace; a probe that did it would be arguing against itself.
+
 ### Capability negotiation
 
 Most WebMCP demos expose actions. A11yMCP exposes a *negotiation*:
@@ -293,14 +345,14 @@ returns 15 on `/` and 21 on `/demo` (20 imperative + the declarative
 
 | Path | Role |
 |---|---|
-| `lib/webmcp/` | `runtime` (register/execute/lifecycle) · `mcp` (MCP result envelope) · `polyfill` · `tools` (the 20 tools) · `schemas` |
+| `lib/webmcp/` | `runtime` (register/execute/lifecycle) · `mcp` (MCP result envelope) · `declarative` (form → schema) · `federation` (cross-origin) · `polyfill` · `tools` (the 20 tools) · `schemas` |
 | `lib/accessibility/` | `manifest` · `tree` · `audits` · `negotiation` · `remediation` · `verification` · `profiles` · `evidence-report` |
 | `lib/ecommerce/` | deterministic NOMA catalog / cart / checkout |
 | `lib/agent/` | `guided-demo` (a labelled, deterministic agent) · `intent-parser` · `actuation-baseline` (the live no-WebMCP lane) · `proof-race` |
 | `app/` | `/` landing · `/demo` · `/inspector` · `/.well-known/a11ymcp` · `/api/a11ymcp-manifest` |
-| `public/` | `a11ymcp-adapter.js` · `partner/` (static third-party page + its manifest) |
+| `public/` | `a11ymcp-adapter.js` · `a11ymcp-probe.js` (the bookmarklet) · `tool-frame.html` (the cross-origin widget) · `partner/` (static third-party page + its manifest) |
 | `a11ymcp-contract/` | manifest + adapter-manifest schemas · capability spec · adapter contract · two example site configs · README |
-| `tests/` | `unit/` (123, incl. native conformance + MCP envelope + background-tab) · `e2e/` (golden + negatives + adapter + judge mode) · `eval/` (benchmark + transport trace) |
+| `tests/` | `unit/` (142) · `e2e/` (14: golden + negatives + adapter + judge mode + cross-origin) · `eval/` (benchmark + transport trace) |
 
 ## Evidence
 
@@ -308,8 +360,8 @@ returns 15 on `/` and 21 on `/demo` (20 imperative + the declarative
 |---|---|---|
 | [`docs/evidence/webmcp-transport-trace.json`](docs/evidence/webmcp-transport-trace.json) | `registerTool → getTools → executeTool`, MCP-shaped results, the native `(descriptor, jsonString)` call shape, schema + gate rejections, task-scoped unregistration | `npm run eval:webmcp` |
 | [`public/eval-results.json`](public/eval-results.json) | measured WebMCP-vs-actuation benchmark (0.83 vs 0.17 task success) | `npm run eval:webmcp` |
-| `npm run test` | 123 unit tests — schemas, audits, negotiation, verification scoping, polyfill, **native conformance**, **MCP result envelope**, **background-tab safety**, security negatives | — |
-| `npm run test:e2e` | golden purchase path, security negatives, the drop-in adapter on the static page, **judge mode and the live side-by-side proof** | — |
+| `npm run test` | 142 unit tests — schemas, audits, negotiation, verification scoping, polyfill, **native conformance**, **MCP result envelope**, **background-tab safety**, security negatives | — |
+| `npm run test:e2e` | golden purchase path, security negatives, the drop-in adapter, declarative-form schemas and `toolautosubmit`, the probe, judge mode and the live side-by-side proof, **and cross-origin `exposedTo` across a real origin boundary** | — |
 | `npm run eval:tools` | agent-first tool-description scorecard | — |
 | [`docs/evidence/external-agent-transcript.md`](docs/evidence/external-agent-transcript.md) | *optional* — a run in a browser with **native** WebMCP. Not captured; not a dependency of any claim. | — |
 
@@ -350,8 +402,8 @@ confirm the order. Then open `/inspector` and run **chain verification**, and
 the console).
 
 ```bash
-npm run test          # 123 unit tests (incl. strict native-WebMCP conformance)
-npm run test:e2e      # golden path + security negatives + adapter + judge mode
+npm run test          # 142 unit tests (incl. strict native-WebMCP conformance)
+npm run test:e2e      # golden + negatives + adapter + judge mode + cross-origin
 npm run eval:tools    # tool-quality scorecard
 npm run eval:webmcp   # benchmark + transport trace -> writes JSON evidence
 npm run build         # production build
@@ -370,7 +422,7 @@ labelled as such (a native-WebMCP agent drives the identical tool path).
 
 Next.js 16 (App Router) · React 19 · TypeScript · Zod · `document.modelContext`
 (+ spec polyfill) · vanilla-JS drop-in adapter · Playwright · Vitest ·
-123 unit tests · reproducible benchmark · zero runtime dependencies beyond
+142 unit tests · reproducible benchmark · zero runtime dependencies beyond
 `next` / `react` / `zod`
 
 ## Demo video

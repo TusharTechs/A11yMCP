@@ -31,3 +31,16 @@ The adapter is site-owned code that applies manifest directives. Rules:
 9. Registrations are torn down by aborting the `AbortSignal` passed to
    `registerTool(definition, { signal })`. Do not depend on a returned handle
    or on `unregisterTool` — neither is in the spec.
+10. Cross-origin exposure is **default-deny and per tool**. A tool with no
+    `exposedTo` is same-origin only; naming an origin in
+    `registerTool(def, { exposedTo: [...] })` is the only way to share one.
+    An embedder that asks for a tool it was not given must be **refused with
+    a reason**, not handed an empty result — "you may not" and "there is
+    nothing" are different answers, and an agent needs to know which it got.
+11. The framed document is the authority. An embedder's
+    `getTools({ fromOrigins })` states an interest, not an entitlement, and
+    the frame must still be granted `allow="tools"` by its embedder before it
+    may expose anything at all.
+12. Declarative form tools submit **only** when the form carries
+    `toolautosubmit`. Leave it off for anything consequential: the agent may
+    fill the form, and a person presses the button.

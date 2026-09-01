@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-09-01T14:35:59.340Z",
+  "capturedAt": "2026-09-01T15:01:38.650Z",
   "environment": "playwright chromium via npm run dev",
   "transport": "A11yMCP spec-compatible polyfill",
   "toolCount": 21,

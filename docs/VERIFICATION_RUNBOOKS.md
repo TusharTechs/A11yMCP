@@ -83,6 +83,30 @@ For stable Chrome without a flag, set `WEBMCP_ORIGIN_TRIAL_TOKEN` in the
 If registration silently fails, fix types/webmcp.d.ts + lib/webmcp/runtime.ts
 + lib/webmcp/polyfill.ts only (isolated by design) and re-run.
 
+## Runbook A3 — cross-origin exposure
+
+1. Open `/inspector` and find **Cross-origin tools**.
+2. Confirm the iframe carries `allow="tools"` and
+   `sandbox="allow-scripts"` (no `allow-same-origin`, so the widget has an
+   opaque origin and `postMessage` is the only channel).
+3. Press **Ask the widget for its tools**. Required:
+   - `getTools() → 2 tool(s)` — the widget exposed two of three
+   - the exposed tool executes and returns data from inside the widget
+   - `charge_travel_card` is **refused by name**, with a reason
+4. Untick **the widget trusts this origin** and ask again: every request is
+   refused at the origin gate.
+5. The widget's own panel logs each decision it made.
+
+Automated equivalent: `npx playwright test tests/e2e/cross-origin.spec.ts`.
+
+## Runbook A4 — the probe bookmarklet
+
+1. Copy the bookmarklet from the landing page into a new bookmark.
+2. Run it on `/partner`: contract **declared**, 8 tools, 2 declarative forms.
+3. Run it on any ordinary website: contract **none**, with a note on what an
+   agent would have to do instead. Confirm it changes nothing on the page —
+   press Escape and no trace of it remains.
+
 ## Runbook B — ChatGPT in-app browser (OPTIONAL, native-WebMCP agent)
 
 Optional supplementary evidence — not a dependency of any claim. See

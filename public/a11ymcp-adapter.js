@@ -14,7 +14,7 @@
  * It never invents a fix. It only applies directives the manifest declares,
  * every mutation is reversible, and remediation is approval-gated.
  *
- * No framework, no build step. ~7 KB. MIT.
+ * No framework, no build step. 8 KB gzipped. MIT.
  */
 (function () {
   "use strict";
@@ -517,34 +517,204 @@
     );
   }
 
-  /* ---- WebMCP declarative API: form[toolname] -> tool -------------- */
+  /* ---- WebMCP declarative API: form[toolname] -> tool --------------
+   * Mirrors lib/webmcp/declarative.ts. A form's schema is derived from its
+   * fields — types, enums, required, and per-field descriptions from
+   * `toolparamdescription`, falling back to the label (minus nested
+   * controls), then `aria-description`, then the placeholder.
+   *
+   * The tool submits ONLY when the form carries `toolautosubmit`. Otherwise
+   * it fills the fields and stops, leaving the submit to the person.
+   */
+
+  var EXCLUDED_TYPES = ["submit", "button", "reset", "image", "hidden", "file", "password"];
+  var LABELABLE = "input,select,textarea,button,meter,output,progress";
+
+  function isExposable(el) {
+    var tag = el.tagName.toLowerCase();
+    if (["input", "select", "textarea"].indexOf(tag) === -1) return false;
+    var type = (el.type || "").toLowerCase();
+    if (EXCLUDED_TYPES.indexOf(type) !== -1) return false;
+    return !!el.name;
+  }
+
+  function labelTextFor(field) {
+    var label = null;
+    if (field.id) {
+      try {
+        label = document.querySelector('label[for="' + CSS.escape(field.id) + '"]');
+      } catch (e) {
+        label = null;
+      }
+    }
+    if (!label && field.closest) label = field.closest("label");
+    if (!label) return null;
+    var clone = label.cloneNode(true);
+    Array.prototype.slice.call(clone.querySelectorAll(LABELABLE)).forEach(function (n) {
+      n.parentNode.removeChild(n);
+    });
+    var text = (clone.textContent || "").replace(/\s+/g, " ").trim();
+    return text || null;
+  }
+
+  function fieldDescription(field) {
+    return (
+      field.getAttribute("toolparamdescription") ||
+      labelTextFor(field) ||
+      field.getAttribute("aria-description") ||
+      field.getAttribute("placeholder") ||
+      null
+    );
+  }
+
+  var INPUT_FORMATS = {
+    email: "email",
+    url: "uri",
+    date: "date",
+    "datetime-local": "date-time",
+    time: "time",
+    tel: "phone",
+  };
+
+  function fieldType(field, group) {
+    var tag = field.tagName.toLowerCase();
+
+    if (tag === "select") {
+      var options = Array.prototype.slice
+        .call(field.options)
+        .map(function (o) { return o.value; })
+        .filter(function (v) { return v !== ""; });
+      if (field.multiple) {
+        return options.length
+          ? { type: "array", items: { type: "string", enum: options } }
+          : { type: "array", items: { type: "string" } };
+      }
+      return options.length ? { type: "string", enum: options } : { type: "string" };
+    }
+
+    if (tag === "textarea") return { type: "string" };
+
+    var type = (field.type || "text").toLowerCase();
+    var values = group.map(function (g) { return g.value; });
+
+    if (type === "checkbox") {
+      return group.length > 1
+        ? { type: "array", items: { type: "string", enum: values } }
+        : { type: "boolean" };
+    }
+    if (type === "radio") return { type: "string", enum: values };
+    if (type === "number" || type === "range") {
+      var num = { type: "number" };
+      if (field.min !== "") num.minimum = Number(field.min);
+      if (field.max !== "") num.maximum = Number(field.max);
+      return num;
+    }
+    var out = { type: "string" };
+    if (INPUT_FORMATS[type]) out.format = INPUT_FORMATS[type];
+    return out;
+  }
+
+  function fieldGroups(form) {
+    var groups = [];
+    var index = {};
+    Array.prototype.slice.call(form.elements).forEach(function (el) {
+      if (!isExposable(el)) return;
+      if (index[el.name] === undefined) {
+        index[el.name] = groups.length;
+        groups.push({ name: el.name, fields: [el] });
+      } else {
+        groups[index[el.name]].fields.push(el);
+      }
+    });
+    return groups;
+  }
+
+  function declarativeSchema(form) {
+    var properties = {};
+    var required = [];
+    fieldGroups(form).forEach(function (group) {
+      var field = group.fields[0];
+      var prop = fieldType(field, group.fields);
+      var description = fieldDescription(field);
+      if (description) prop.description = description;
+      properties[group.name] = prop;
+      var isRequired = group.fields.some(function (f) { return f.hasAttribute("required"); });
+      if (isRequired) required.push(group.name);
+    });
+    return { type: "object", properties: properties, required: required, additionalProperties: false };
+  }
+
+  function fillDeclarativeForm(form, values) {
+    var filled = [];
+    var byName = {};
+    fieldGroups(form).forEach(function (g) { byName[g.name] = g.fields; });
+
+    Object.keys(values).forEach(function (name) {
+      var group = byName[name];
+      if (!group || !group.length) return;
+      var value = values[name];
+      var first = group[0];
+      var type = (first.type || "").toLowerCase();
+
+      if (type === "radio") {
+        var match = group.filter(function (f) { return f.value === String(value); })[0];
+        if (!match) return;
+        match.checked = true;
+        match.dispatchEvent(new Event("change", { bubbles: true }));
+        filled.push(name);
+        return;
+      }
+
+      if (type === "checkbox") {
+        var wanted = Array.isArray(value) ? value.map(String) : [String(value)];
+        group.forEach(function (box) {
+          box.checked =
+            group.length > 1
+              ? wanted.indexOf(box.value) !== -1
+              : value === true || value === "true";
+          box.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+        filled.push(name);
+        return;
+      }
+
+      first.value = Array.isArray(value) ? value.map(String).join(",") : String(value);
+      first.dispatchEvent(new Event("input", { bubbles: true }));
+      first.dispatchEvent(new Event("change", { bubbles: true }));
+      filled.push(name);
+    });
+
+    return filled;
+  }
 
   function scanDeclarativeForms(mc) {
     Array.prototype.slice.call(document.querySelectorAll("form[toolname]")).forEach(function (form) {
       var name = form.getAttribute("toolname");
       if (!name) return;
-      var fields = [];
-      Array.prototype.slice.call(form.elements).forEach(function (el) {
-        if (el.name && fields.indexOf(el.name) === -1) fields.push(el.name);
-      });
-      var props = {};
-      fields.forEach(function (f) { props[f] = { type: "string" }; });
+      var autoSubmit = form.hasAttribute("toolautosubmit");
+
       mc.registerTool({
         name: name,
         title: name,
-        description: form.getAttribute("tooldescription") || 'Submit the "' + name + '" form.',
-        inputSchema: { type: "object", properties: props, required: [], additionalProperties: false },
-        annotations: { readOnlyHint: false, declarative: true },
+        description: form.getAttribute("tooldescription") || 'Fill the "' + name + '" form.',
+        inputSchema: declarativeSchema(form),
+        annotations: { readOnlyHint: false, declarative: true, destructiveHint: autoSubmit },
         execute: function (rawInput) {
           var input = coerceInput(rawInput);
           input = input && typeof input === "object" ? input : {};
-          Object.keys(input).forEach(function (k) {
-            var field = form.elements.namedItem(k);
-            if (field && "value" in field) field.value = String(input[k]);
+          var filled = fillDeclarativeForm(form, input);
+          if (autoSubmit) {
+            if (typeof form.requestSubmit === "function") form.requestSubmit();
+            else form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+          }
+          return ok({
+            tool: name,
+            filled: filled,
+            submitted: autoSubmit,
+            nextStep: autoSubmit
+              ? null
+              : "The form is filled but not submitted. Ask the user to review and submit it.",
           });
-          if (typeof form.requestSubmit === "function") form.requestSubmit();
-          else form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-          return ok({ submitted: true, tool: name });
         },
       });
     });

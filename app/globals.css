@@ -883,3 +883,97 @@ h1 {
   display: grid;
   gap: 0.4rem;
 }
+
+/* ---- The probe bookmarklet ------------------------------------------- */
+
+.bookmarklet {
+  border-style: dashed;
+  border-color: var(--accent);
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: all;
+}
+
+/* ---- Cross-origin tools ---------------------------------------------- */
+
+.cross-origin {
+  display: grid;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+@media (min-width: 900px) {
+  .cross-origin {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.tool-frame {
+  inline-size: 100%;
+  block-size: 300px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.frame-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.frame-log li {
+  padding: 0.4rem 0.55rem;
+  border-left: 3px solid var(--border);
+  background: var(--code-bg);
+  border-radius: 0 6px 6px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-word;
+}
+
+.frame-log .frame-ok,
+.frame-log .frame-listed,
+.frame-log .frame-executed {
+  border-left-color: #16a34a;
+}
+
+.frame-log .frame-refused,
+.frame-log .frame-denied-origin,
+.frame-log .frame-denied-tool {
+  border-left-color: #dc2626;
+}
+
+/* the framed widget's own page */
+
+.frame-widget {
+  padding: 1rem;
+  font: 14px/1.5 system-ui, -apple-system, sans-serif;
+}
+
+.frame-widget h1 {
+  font-size: 1.15rem;
+  margin: 0 0 0.25rem;
+}
+
+.frame-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.75rem;
+  margin: 0.75rem 0;
+  font-size: 0.85rem;
+}
+
+.frame-facts dt {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.frame-facts dd {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-word;
+}

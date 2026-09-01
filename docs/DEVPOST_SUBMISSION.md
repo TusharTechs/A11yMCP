@@ -65,6 +65,15 @@ sites declare adaptations; agents adapt per person; humans stay in control.
 Controlled demo site; supported barrier set; task-scoped evidence, not
 legal certification.
 
+## 12b. Cross-origin and declarative depth
+Cross-origin tool access is implemented, not sketched: a widget in an iframe
+sandboxed without `allow-same-origin` (an opaque origin) registers three
+tools, exposes two via `registerTool(def, { exposedTo })`, and refuses the
+third by name when the embedder asks for it. Declarative form tools derive
+their schemas from the markup — types, formats, enums, bounds, `required`,
+`toolparamdescription` — and honour `toolautosubmit`, so a consequential form
+is filled by the agent and submitted by a person.
+
 ## 13. Adoption is one manifest + one script tag
 `/partner` ("Vellum Books") is a plain static HTML page this app does not
 render. `public/a11ymcp-adapter.js` (framework-free) reads its
