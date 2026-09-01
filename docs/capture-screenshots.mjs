@@ -68,5 +68,33 @@ await page.waitForFunction(() => {
 });
 await shot(page, "06-partner-adapter.png");
 
+// 7 — judge mode: the one-button checklist, mid-run at the approval gate
+await page.goto(`${BASE}/demo?judge=1`, { waitUntil: "networkidle" });
+const judge = page.getByRole("region", { name: "Judge mode" });
+await judge.getByRole("button", { name: "Start the run" }).click();
+await judge
+  .getByRole("alertdialog", { name: "Approval requested" })
+  .waitFor({ timeout: 30000 });
+await shot(page, "07-judge-mode.png");
+
+// 8 — the side-by-side proof, both lanes finished
+await judge.getByRole("button", { name: "Approve", exact: true }).click();
+await judge
+  .getByRole("alertdialog", { name: "Order confirmation" })
+  .waitFor({ timeout: 30000 });
+await judge.getByRole("button", { name: "Confirm order" }).click();
+
+const race = page.getByRole("region", { name: "Side-by-side proof" });
+await race.getByRole("button", { name: "Run both lanes" }).click();
+await race
+  .getByRole("alertdialog", { name: "Approval requested" })
+  .waitFor({ timeout: 30000 });
+await race.getByRole("button", { name: "Approve", exact: true }).click();
+await race
+  .getByText(/ORDER PLACED — verified by the site/)
+  .waitFor({ timeout: 60000 });
+await race.scrollIntoViewIfNeeded();
+await shot(page, "08-proof-race.png");
+
 await browser.close();
 console.log(`Wrote screenshots to ${OUT}`);

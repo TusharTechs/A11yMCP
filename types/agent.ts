@@ -4,7 +4,9 @@ import type { CheckoutValues } from "./ecommerce";
 export type ScenarioId =
   | "keyboard-checkout"
   | "screen-reader-checkout"
-  | "low-vision-checkout";
+  | "low-vision-checkout"
+  /** Judge mode only — not listed in the scenario picker. */
+  | "judge-run";
 
 export type AgentPhase =
   | "idle"

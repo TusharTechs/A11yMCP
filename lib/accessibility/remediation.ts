@@ -72,8 +72,34 @@ function pushHistory(result: RemediationResult): void {
   listeners.forEach((listener) => listener());
 }
 
+/**
+ * Waits one frame — but never longer than {@link FRAME_FALLBACK_MS}.
+ *
+ * Browsers do not fire `requestAnimationFrame` in a hidden or backgrounded
+ * tab, and remediation awaits a render before it re-audits. Without the
+ * timer fallback, every `repair_*` tool hangs forever the moment the page
+ * is not the foreground tab — which is exactly how an agent driving the
+ * page in a background tab would find it.
+ */
+const FRAME_FALLBACK_MS = 50;
+
 function nextFrame(): Promise<void> {
-  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame !== "function") {
+      setTimeout(resolve, 0);
+      return;
+    }
+
+    let settled = false;
+    const settle = (): void => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+
+    requestAnimationFrame(settle);
+    setTimeout(settle, FRAME_FALLBACK_MS);
+  });
 }
 
 async function afterRender(): Promise<void> {

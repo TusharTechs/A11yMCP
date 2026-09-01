@@ -2,6 +2,24 @@
 
 Run in order. Record outputs into docs/evidence/.
 
+## Runbook 0 — the sixty-second path (start here)
+
+1. Open `/demo?judge=1`.
+2. Confirm the transport chip (`native document.modelContext` or the
+   A11yMCP polyfill) and the tool count.
+3. Press **Start the run**. Steps 1–4 fill in unattended; step 4 must read
+   `N accepted, 1 rejected` — the run asks for `high_contrast`, which this
+   site does not declare.
+4. The run must **stop** at the approval box. Approve it.
+5. Step 7 must read `Verification: PASS`; confirm the order at the second
+   gate; the checklist reaches `8/8` with an order id.
+6. Press **Run both lanes**. The left lane must report the size options as
+   not in the tab order and end with `unauthorized mutations: 3`; the right
+   lane must end `ORDER PLACED`, `unauthorized mutations: 0`,
+   `site verifications: 1`.
+
+Automated equivalent: `npx playwright test tests/e2e/judge-mode.spec.ts`.
+
 ## Runbook A — chain verification (any browser)
 
 Works with or without native WebMCP: without it, A11yMCP installs a

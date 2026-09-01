@@ -699,3 +699,187 @@ h1 {
     gap: 20px;
   }
 }
+/* ---- Judge mode (/demo?judge=1) ------------------------------------- */
+
+.judge {
+  border-width: 2px;
+  border-color: var(--accent);
+}
+
+.judge-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.judge-head h2 {
+  margin: 0.2rem 0 0.4rem;
+  font-size: 1.5rem;
+}
+
+.judge-head > div:first-child {
+  max-width: 46rem;
+}
+
+.judge-steps {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.judge-step {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  opacity: 0.55;
+}
+
+.judge-step > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.judge-done {
+  opacity: 1;
+  border-color: #16a34a;
+}
+
+.judge-active {
+  opacity: 1;
+  border-color: var(--accent);
+}
+
+.judge-marker {
+  flex: 0 0 1.55rem;
+  height: 1.55rem;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.judge-done .judge-marker {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #ffffff;
+}
+
+.judge-active .judge-marker {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.judge-step-label {
+  font-weight: 600;
+}
+
+.judge-step-claim {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.judge-step-detail {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  background: var(--code-bg);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  justify-self: start;
+}
+
+.judge-prompt {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.judge-prompt summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* ---- Side-by-side proof --------------------------------------------- */
+
+.race-lanes {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+@media (min-width: 900px) {
+  .race-lanes {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.race-lane {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem;
+}
+
+.race-lane h3 {
+  margin: 0;
+}
+
+.race-lane-actuation {
+  border-color: #dc2626;
+}
+
+.race-lane-webmcp {
+  border-color: #16a34a;
+}
+
+.race-steps {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.race-steps li {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.45rem 0.6rem;
+  border-left: 3px solid var(--border);
+  background: var(--code-bg);
+  border-radius: 0 6px 6px 0;
+}
+
+.race-steps .race-pass {
+  border-left-color: #16a34a;
+}
+
+.race-steps .race-fail {
+  border-left-color: #dc2626;
+}
+
+.race-steps .race-warn {
+  border-left-color: #d97706;
+}
+
+.race-step-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.race-step-detail {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.race-verdict {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.4rem;
+}

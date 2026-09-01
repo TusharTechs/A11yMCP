@@ -1,5 +1,14 @@
 # Final Judge Q&A (evidence-backed)
 
+## "I have sixty seconds."
+Open **`/demo?judge=1`** and press one button. An eight-step checklist fills
+in as it happens: the need, discovery, the audit, a negotiation that
+**refuses** one need this site does not declare, the run stopping for your
+approval, the adaptation, the site's own verification, the purchase. Then
+press **Run both lanes** for the same task attempted with and without
+WebMCP, live, on the same page. If you would rather drive it with your own
+agent, judge mode has a copy-paste prompt.
+
 ## Chrome/WebMCP engineer — "Why is WebMCP necessary?"
 Because the demonstrated behaviors require a declared contract: capability
 discovery (`get_accessibility_capabilities`), site consent (approval-gated
@@ -65,13 +74,26 @@ rejection; stale-state rejection with `nextAction` hints; everything logged.
 Negative proofs in `tests/unit/security.test.ts`,
 `tests/e2e/negative.spec.ts`, and the transport trace.
 
+## Skeptic — "Is the comparison rigged?"
+No, and you can watch it. The side-by-side proof runs both lanes live on the
+same fixture in front of you — it does not animate a stored result. The
+actuation lane genuinely enumerates the tab order (the size options are not
+in it), genuinely probes the computed focus style, and then genuinely
+injects the `tabindex` it was never authorized to inject, so the
+`unauthorized mutations` counter is a count of real DOM writes. It undoes
+them before it finishes. The lane even *succeeds* at reaching the control —
+the point is not that actuation cannot act, it is that it cannot ask, cannot
+get consent, and cannot verify. The wider six-task measurement is
+`npm run eval:webmcp` (`public/eval-results.json`), and it names the task
+where actuation wins.
+
 ## Hackathon judge — "Why does this beat other WebMCP projects?"
 Strongest idea (accessibility capability *negotiation*), a real
 implementation (20 tools + a declarative form, imperative + declarative APIs,
 MCP-shaped tool results, task-scoped `AbortSignal` lifecycle, cancellation, a
 spec-compatible polyfill *and* a strict native-conformance suite), decoupled
 adoption (a static page made adaptable by a manifest + a script tag),
-reproducible evidence (transport trace + measured benchmark + 120 unit +
+reproducible evidence (transport trace + measured benchmark + 123 unit +
 e2e), and a complete human
 story (blocked task → negotiated adaptation → verified → completed purchase).
 Open gaps are listed honestly in `docs/STAGE_ONE_COMPLIANCE.md` rather than

@@ -43,6 +43,23 @@ Status key: [x] done · [~] partial · [ ] pending
       `<script>`. Covered by `tests/e2e/adapter.spec.ts`.
 - [x] Manifest served independently at `/.well-known/a11ymcp` (and
       `/api/a11ymcp-manifest`).
+- [x] A judge can see the whole thesis in sixty seconds without reading
+      anything: `/demo?judge=1` is one button and a live eight-step
+      checklist, with the transport and tool count stated up front and a
+      copy-paste prompt for driving it with their own agent. Covered by
+      `tests/e2e/judge-mode.spec.ts`.
+- [x] The WebMCP-vs-actuation comparison is *run*, not replayed: the
+      side-by-side proof executes both lanes live against the same fixture.
+      The actuation lane really walks the tab order and really injects the
+      tabindex it was never authorized to inject (and undoes it), so the
+      `unauthorized mutations` counter on screen is measured, not asserted.
+- [x] Remediation tools cannot hang in a hidden or backgrounded tab.
+      `requestAnimationFrame` does not fire there, and remediation awaits a
+      render before it re-audits — so every `repair_*` tool used to hang
+      forever, silently, whenever the page was not the foreground tab (which
+      is exactly how an agent in a side panel or a background tab would find
+      it). Fixed with a timer fallback; pinned by
+      `tests/unit/background-tab.test.ts`.
 - [x] Live project behaves as described (Playwright golden + negative specs
       pass; run `npm run test:e2e`)
 - [x] No secret credentials required for basic judging (zero env vars)

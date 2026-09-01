@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import AgentPanel from "@/components/agent/AgentPanel";
+import JudgeMode from "@/components/judge/JudgeMode";
+import ProofRace from "@/components/judge/ProofRace";
 import ChainVerification from "@/components/webmcp/ChainVerification";
 import LiveStorefront from "@/components/fixture/LiveStorefront";
 import OriginalStorefront from "@/components/fixture/OriginalStorefront";
@@ -52,6 +54,7 @@ export default function DemoPage() {
   const negotiation = useNegotiationState();
   const eventLog = useEventLog();
 
+  const [judgeMode, setJudgeMode] = useState(false);
   const [siteId, setSiteId] = useState<SiteId>(getSiteId());
   const [auditSummary, setAuditSummary] = useState<AuditResult[] | null>(null);
   const [verification, setVerification] = useState<VerificationResult | null>(
@@ -94,6 +97,13 @@ export default function DemoPage() {
 
   useEffect(() => {
     return subscribeSite(() => setSiteId(getSiteId()));
+  }, []);
+
+  useEffect(() => {
+    // Read the query directly instead of useSearchParams() so /demo stays
+    // statically prerendered and needs no Suspense boundary.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setJudgeMode(new URLSearchParams(window.location.search).has("judge"));
   }, []);
 
   useEffect(() => {
@@ -169,6 +179,8 @@ export default function DemoPage() {
 
   return (
     <main id="main">
+      {judgeMode ? <JudgeMode /> : null}
+
       <section className="panel need-strip">
         <div>
           <p className="group-label">User need</p>
@@ -317,6 +329,8 @@ export default function DemoPage() {
           ) : null}
         </section>
       </div>
+
+      {judgeMode ? <ProofRace /> : null}
 
       <ChainVerification />
 

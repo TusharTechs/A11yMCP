@@ -23,10 +23,16 @@ of the polyfill. That is a nice-to-have confirmation, not a prerequisite.
 
 ## Runbook (when a native WebMCP browser is available)
 
-1. Open https://a11ymcp.vercel.app/demo in the agent browser.
+1. Open https://a11ymcp.vercel.app/demo?judge=1 in the agent browser.
+   (In desktop Chrome this means enabling
+   `chrome://flags/#enable-webmcp-testing` and relaunching first, unless the
+   deployment carries a Chrome 149 origin-trial token — see
+   `WEBMCP_ORIGIN_TRIAL_TOKEN` in `next.config.ts`.)
 2. Confirm `/inspector` shows "Native document.modelContext detected".
-3. Ask the agent, verbatim: "I can only use a keyboard. Help me buy the
-   NOMA Runner in size 9."
+3. Ask the agent using the prompt in judge mode — open `/demo?judge=1`,
+   expand "Prefer to drive it with your own agent?", and press **Copy
+   prompt**. It names the tools and asks the agent to report anything the
+   site cannot support rather than working around it.
 4. Record: discovered tool names, every tool call (name + arguments +
    result), any self-correction, the approval/confirmation pauses, and the
    final order id.
