@@ -60,7 +60,16 @@ interface ToolExposure {
  */
 export function ensureModelContext(): ModelContext | null {
   if (typeof document === "undefined") return null;
-  if (document.modelContext) return document.modelContext;
+
+  // A native implementation is expected to synthesize `<form toolname>` into
+  // a tool itself. Not every one does — ChatGPT's browser did not, and the
+  // form silently ceased to exist for the agent, which then fell back to
+  // clicking the checkbox by hand. Reconcile against whatever the live
+  // implementation actually exposes rather than assuming.
+  if (document.modelContext) {
+    syncDeclarativeForms(document.modelContext);
+    return document.modelContext;
+  }
 
   const tools = new Map<string, RegisteredTool>();
   const exposure = new Map<string, ToolExposure>();
@@ -206,10 +215,27 @@ function syncDeclarativeForms(mc: ModelContext): void {
 
   const registered = new Map<HTMLFormElement, { unregister: () => void }>();
 
-  const scan = (): void => {
+  /** Tool names the live implementation is already exposing. */
+  const alreadyExposed = async (): Promise<Set<string>> => {
+    if (typeof mc.getTools !== "function") return new Set();
+    try {
+      const tools = await mc.getTools();
+      if (!Array.isArray(tools)) return new Set();
+      return new Set(
+        tools
+          .map((tool) => (tool as { name?: unknown })?.name)
+          .filter((name): name is string => typeof name === "string")
+      );
+    } catch {
+      return new Set();
+    }
+  };
+
+  const scan = async (): Promise<void> => {
     const forms = new Set(
       Array.from(document.querySelectorAll<HTMLFormElement>("form[toolname]"))
     );
+    const exposed = await alreadyExposed();
 
     for (const [form, handle] of registered) {
       if (!forms.has(form)) {
@@ -222,6 +248,8 @@ function syncDeclarativeForms(mc: ModelContext): void {
       if (registered.has(form)) return;
       const name = form.getAttribute("toolname");
       if (!name) return;
+      // The browser already synthesized this one — don't shadow it.
+      if (exposed.has(name)) return;
 
       const autoSubmit = form.hasAttribute("toolautosubmit");
       const handle = mc.registerTool({
@@ -266,8 +294,8 @@ function syncDeclarativeForms(mc: ModelContext): void {
     });
   };
 
-  scan();
-  new MutationObserver(scan).observe(document.documentElement, {
+  void scan();
+  new MutationObserver(() => void scan()).observe(document.documentElement, {
     childList: true,
     subtree: true,
     attributes: true,

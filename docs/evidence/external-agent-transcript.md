@@ -188,6 +188,31 @@ audit_form_associations             verify_accessibility_profile
 | The "Negotiate profile" button did not appear in the event log | Accepted. The phase chip tracks the *guided* agent, so manual UI actions leave it idle. Confusing, and worth fixing. |
 | An unnamed button remained at the end | Working as designed and correctly reported: it is outside the negotiated profile, so it is an advisory rather than a gate. It is still a real defect in the fixture. |
 
+### The tool count is itself a finding
+
+The agent listed **20** tools. On `/demo` the page's own polyfill registers
+**21** — the extra one being `submit_accessibility_preferences`, synthesized
+from the `<form toolname>` declarative markup.
+
+The missing tool is exactly why the agent reported this:
+
+> Before those page-tool calls, I used keyboard activation to check the page's
+> "high contrast" checkbox and activate its "Negotiate profile" button.
+
+It clicked the form by hand because it had no tool for it. Tracing that back
+found a real gap: `syncDeclarativeForms` only ran inside the polyfill's own
+construction path, so whenever a *native* implementation was present,
+A11yMCP registered none of its declarative forms and simply assumed the
+browser would synthesize them. Chrome does. ChatGPT's browser did not, and
+the form quietly ceased to exist for the agent.
+
+A11yMCP now reconciles against whatever the live implementation actually
+exposes: it asks `getTools()` first and registers only the forms the browser
+did not synthesize, so the tool exists either way and is never shadowed.
+
+This is also the strongest available signal about which transport was live:
+had the polyfill been running, all 21 tools would have been present.
+
 ## Run 2 — optional second scenario
 
 **Prompt:**

@@ -7,6 +7,7 @@ import {
   registerA11yTool,
   unregisterA11yTool,
 } from "@/lib/webmcp/runtime";
+import { ensureModelContext } from "@/lib/webmcp/polyfill";
 
 /**
  * Conformance against a *native* WebMCP implementation.
@@ -321,5 +322,49 @@ describe("conformance against a strict native document.modelContext", () => {
     });
 
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("declarative forms under a native implementation", () => {
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <form toolname="submit_preferences" tooldescription="Stage the user's needs.">
+        <input type="checkbox" name="needs" value="keyboard_only" />
+        <input type="checkbox" name="needs" value="strong_focus" />
+        <button type="submit">Negotiate</button>
+      </form>`;
+  });
+
+  it("registers a form the native implementation did not synthesize", async () => {
+    // ChatGPT's browser exposed the 20 imperative tools and no form tool, so
+    // the agent fell back to clicking the checkbox by hand. A11yMCP now fills
+    // that gap instead of assuming the browser covers it.
+    const native = createStrictNativeModelContext();
+    (document as unknown as { modelContext: ModelContext }).modelContext = native;
+
+    ensureModelContext();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(await toolNames(native)).toContain("submit_preferences");
+  });
+
+  it("does not shadow a form the implementation already exposes", async () => {
+    const native = createStrictNativeModelContext();
+    (document as unknown as { modelContext: ModelContext }).modelContext = native;
+
+    // the browser synthesized it first
+    await native.registerTool({
+      name: "submit_preferences",
+      description: "browser-synthesized",
+      execute: () => null,
+    });
+
+    ensureModelContext();
+    await new Promise((r) => setTimeout(r, 20));
+
+    const tools = (await native.getTools!()) as Array<{ name: string; description?: string }>;
+    const matches = tools.filter((t) => t.name === "submit_preferences");
+    expect(matches).toHaveLength(1);
+    expect(matches[0].description).toBe("browser-synthesized");
   });
 });
