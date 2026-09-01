@@ -249,6 +249,30 @@ For stable Chrome, set `WEBMCP_ORIGIN_TRIAL_TOKEN` in the **build**
 environment and the site sends an `Origin-Trial` header, so a visitor does
 not have to flip `chrome://flags/#enable-webmcp-testing`.
 
+### Driven by a third-party agent
+
+On 2026-09-02, ChatGPT's desktop-app browser was pointed at the deployed site
+and given one sentence — *"I can only use a keyboard, and I have low vision,
+so I need high contrast. Help me buy the NOMA Runner in size 9"* — with no
+tools, capabilities or expected outcomes named.
+
+It discovered all 20 tools, called `get_accessibility_capabilities` first,
+and **rejected `high_contrast` twice**, quoting the manifest reason back. It
+re-negotiated when it wanted more capabilities, waited for confirmation
+before the order, and placed it. Asked afterwards what it had changed that
+the site had not offered, it answered:
+
+> **None. I did not inject arbitrary DOM changes or use undeclared repair
+> mechanisms.**
+
+It also reported five issues against this project, and one of them was a real
+bug: verification returned PASS for a profile where the site had accepted
+*nothing*, because an empty scope has nothing left in it to fail. Fixed, with
+a test that reproduces the agent's exact path.
+
+The full run is pasted unedited — criticism included — in
+[`docs/evidence/external-agent-transcript.md`](docs/evidence/external-agent-transcript.md).
+
 ### Cross-origin tools: `exposedTo`, and default-deny
 
 Most of the WebMCP surface is same-page. The interesting half is what

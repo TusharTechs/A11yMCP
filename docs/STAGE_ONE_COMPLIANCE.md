@@ -92,10 +92,15 @@ Status key: [x] done · [~] partial · [ ] pending
 - [x] Demo video < 3 minutes, YouTube, with audio, explicitly demonstrating
       WebMCP: https://youtu.be/p1m6QgeKI6c — 2:59, narrated. Every interaction is
       driven by `docs/direct-demo.mjs`, so the run is reproducible.
-- [~] Third-party recorded agent transcript (ChatGPT in-app browser / Chrome
-      with a native WebMCP agent). **Optional supplementary evidence, not yet
-      captured** — see `docs/evidence/external-agent-transcript.md`. The
-      primary transport evidence is the reproducible chain trace above.
+- [x] Third-party recorded agent transcript (ChatGPT in-app browser / Chrome
+      with a native WebMCP agent). **Captured 2026-09-02**: ChatGPT's desktop-app browser
+      discovered all 20 tools unprompted, called
+      `get_accessibility_capabilities` first, rejected `high_contrast` twice
+      quoting the manifest reason, and reported making no changes the site had
+      not offered. It also reported five issues against the project, one of
+      which was a real bug (empty-profile PASS, fixed in `789923d`). Pasted
+      unedited in `docs/evidence/external-agent-transcript.md`.
+
 
 ## Evidence files
 
@@ -108,12 +113,27 @@ Status key: [x] done · [~] partial · [ ] pending
 - `public/eval-results.json` — measured WebMCP-vs-actuation benchmark
 - `docs/evidence/deployment.md` — deployed URL + commit hash
 - `docs/VERIFICATION_RUNBOOKS.md` — manual verification instructions
-- `docs/evidence/external-agent-transcript.md` — optional, pending
+- `docs/evidence/external-agent-transcript.md` — a ChatGPT desktop-browser
+  run against the deployed site, pasted unedited (2026-09-02)
 
 ## Honest status
 
 Stage One functional requirements are met: real `document.modelContext`
 registration and execution, a non-trivial workflow, a public repo and
-deployed URL, and passing automated suites. Two submission items are still
-outstanding and tracked openly above: an optional third-party agent
-transcript. It is not faked or pre-claimed.
+deployed URL, passing automated suites, a published demo video, and a
+third-party agent transcript.
+
+What is **not** claimed: no run against a browser's *native* WebMCP
+implementation has been captured. Everything recorded so far ran through the
+page's spec-compatible polyfill, which is what
+`docs/evidence/webmcp-transport-trace.json` reports. The native contract is
+covered by `tests/unit/native-conformance.test.ts`, whose call and return
+shapes were checked against the signatures in the shipping Chrome 152 binary
+— that check is how a return-type mismatch was found and fixed, and a test
+double is not the same thing as a browser.
+
+The ChatGPT run also reported that it sent `approval: true` without
+separately asking the human first. That is a genuine limitation of the trust
+model rather than a defect in this code: a schema can require the literal, it
+cannot require that a person meant it. It is recorded rather than smoothed
+over.
