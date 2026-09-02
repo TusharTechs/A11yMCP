@@ -94,13 +94,26 @@ export function registerA11yTool<TInput>(
 
   // Install the spec-compatible polyfill if the browser has no native
   // WebMCP, then register through whichever implementation is live.
-  const modelContext = ensureModelContext();
-  if (modelContext && typeof modelContext.registerTool === "function") {
+  ensureModelContext();
+  // Server rendering has no `document` at all, so this must not be touched
+  // unguarded — reading it directly here threw a ReferenceError in every
+  // non-DOM test file.
+  const live =
+    typeof document !== "undefined" ? document.modelContext : undefined;
+
+  if (live && typeof live.registerTool === "function") {
     const controller =
       typeof AbortController !== "undefined" ? new AbortController() : null;
 
     try {
-      const registration = modelContext.registerTool(
+      // Written as `document.modelContext.registerTool(...)` deliberately:
+      // that is the spec's own call, and `ensureModelContext()` above
+      // guarantees the property is the live implementation — the browser's
+      // own where one exists, the spec-compatible polyfill otherwise. The
+      // re-check immediately below is what lets it be written that way
+      // without an assertion.
+      if (!document.modelContext) return;
+      const registration = document.modelContext.registerTool(
         {
           name: stored.name,
           title: stored.title,

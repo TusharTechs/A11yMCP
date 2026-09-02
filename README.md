@@ -188,6 +188,39 @@ through [`invokeTool`](lib/webmcp/runtime.ts#L141) →
 [`webmcp-transport-trace.json`](docs/evidence/webmcp-transport-trace.json)
 captures the chain.
 
+### The registration, verbatim
+
+Every tool is registered through the spec's own call. This is
+[`runtime.ts`](lib/webmcp/runtime.ts), lightly abridged:
+
+```js
+document.modelContext.registerTool(
+  {
+    name: "search_products",
+    description:
+      "Searches the deterministic NOMA catalog and updates the visible " +
+      "results. Call at the start of a purchase task; the returned product " +
+      "ids and sizes are the valid inputs for add_product_to_cart.",
+    inputSchema: { /* strict JSON Schema, additionalProperties: false */ },
+    annotations: { readOnlyHint: false, idempotentHint: true },
+    execute: async (input, context) => {
+      const result = await executeA11yTool(name, coerceToolInput(input), {
+        signal: context?.signal,
+      });
+      return toMcpToolResponse(name, result); // MCP content blocks
+    },
+  },
+  { signal: controller.signal } // the spec's unregistration path
+);
+```
+
+`ensureModelContext()` runs first, so `document.modelContext` is always the
+live implementation — the browser's own where one exists, the
+spec-compatible polyfill otherwise. There is no private registry and no
+side channel: [`/inspector`](https://a11ymcp.vercel.app/inspector) lists what
+`getTools()` reports, and every call in the app, the tests and the benchmark
+goes out through `executeTool`.
+
 ### Tools return MCP tool results
 
 WebMCP tools *are* MCP tools, so `execute()` resolves to an MCP tool result —
